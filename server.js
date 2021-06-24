@@ -17,6 +17,9 @@ const MatchState = {
 
 const A = 'A'.charCodeAt(0)
 const Z = 'Z'.charCodeAt(0) + 1
+const DEFAULT_DECK = require("./deck.js")
+const Cards = require("./cards.js")
+
 const makeGameId0 = () => String.fromCharCode(Math.floor(Math.random() * (Z - A) + A))
 const makeGameId = (n = 4) => Array.from({ length: n }).map(makeGameId0).join("")
 const nextId = (() => {
@@ -29,6 +32,77 @@ const nextId = (() => {
 })()
 const createPlayer = (playerName, score = 0, ready = false) => ({ playerId: nextId(), playerName, score, ready })
 
+const shuffle = (deck) => {
+    const newDeck = deck.slice()
+    for (let i = 0; i < deck.length; i++) {
+        const j = i + Math.floor(Math.random() * (deck.length - i))
+        const buf = newDeck[i]
+        newDeck[i] = newDeck[j]
+        newDeck[j] = buf
+    }
+    return newDeck
+}
+
+const dealCards = () => {
+    // shuffle the default deck and deal cards
+    // returns [ [ hands... ], remainder ]
+    // each hand has at least 1 defuse, and 3 bombs in remainder
+    
+    const deck = shuffle(DEFAULT_DECK)
+    const hands = [ [], [], [], [] ]
+    
+    // remove 4 defuse and give 1 to each player
+    let defuseCount = 0
+    for (let i = 0; i < deck.length; i += 1) {
+        if (deck[i] == Cards.DEFUSE) {
+            deck.splice(i, 1)
+            defuseCount += 1
+            if (defuseCount >= 4) {
+                break
+            }
+        }
+    }
+    hands[0].push(Cards.DEFUSE)
+    hands[1].push(Cards.DEFUSE)
+    hands[2].push(Cards.DEFUSE)
+    hands[3].push(Cards.DEFUSE)
+    
+    console.log(deck)
+    console.log(hands)
+    
+    // deal each hand 7 cards (they already had a defuse, so 6 each)
+    for (let hand of hands) {
+        while (hand.length < 7) {
+            const card = deck.shift()
+            if (card != Cards.BOMB) {
+                hand.push(card)
+            }
+        }
+    }
+
+    // shuffle the remainder again
+    const remainder = shuffle(shuffle([ ...deck, Cards.BOMB, Cards.BOMB, Cards.BOMB ]))
+
+    return [ hands, remainder ]
+}
+
+const createGame = (playerName) => {
+    const game = {
+        winner: "",
+        matchState: MatchState.WAITING,
+        players: [ createPlayer(playerName) ],
+        hands: [],
+        discard: [],
+        remainder: []
+    }
+
+    // shuffle deck and deal cards
+    const [ hands, remainder ] = dealCards()
+    game.hands = hands
+    game.remainder = remainder
+    
+    return game
+}
 
 let games = {}
 
@@ -44,11 +118,7 @@ app.get("/create-game", (req, res) => {
     } while (games[gameId])
     
     // create a new game, add to active games
-    const game = {
-        winner: "",
-        matchState: MatchState.WAITING,
-        players: [ createPlayer(playerName) ]
-    }
+    const game = createGame(playerName)
     games[gameId] = game
 
     // the calling player joins immediately
@@ -104,6 +174,7 @@ app.get("/leave", (req, res) => {
                 p.ready = false
             })
         }
+        res.send({ message: "left game" })
     }
 })
 
@@ -125,10 +196,7 @@ app.post("/action", (req, res) => {
         if (!player) {
             res.status(400)
             res.send({ message: "bad player id" })
-            return
-        }
-
-        if (game.matchState == MatchState.PLAYING) {
+        } else if (game.matchState == MatchState.PLAYING) {
             if (action == "play") {
                 player.score += 1
                 if (player.score >= 10) {
@@ -159,7 +227,11 @@ app.post("/action", (req, res) => {
                         game.matchState = MatchState.WAITING
                     }
                 }
+                res.send({ message: "will restart" })
             }
+        } else {
+            res.status(400)
+            res.send({ message: "bad action" })
         }
     }
 })
