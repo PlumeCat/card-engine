@@ -1,10 +1,3 @@
-<!-- index.html -->
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8"/>
-        <script>
-
 // ==================
 // Main script
 // ==================
@@ -167,13 +160,3 @@ class MatchScreen extends GameScreen {
 document.addEventListener("DOMContentLoaded", () => {
     setScreen(new MenuScreen())
 })
-
-
-/////////////////////////
-
-        </script>
-    </head>
-    <body>
-        <h2>welcome to the game</h2>
-    </body>
-</html>

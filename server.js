@@ -97,13 +97,14 @@ app.get("/leave", (req, res) => {
         // WAITING => WAITING
         // PLAYING => WAITING
         if (game.matchState == MatchState.PLAYING) {
-            // TODO: abort game, go back to waiting state
+            // TODO: abort game, go back to waiting state  (until we can automate turns for missing/disconnected players)
             game.matchState = MatchState.WAITING
             game.players.forEach(p => {
                 p.score = 0
                 p.ready = false
             })
         }
+        res.send({})
     }
 })
 
@@ -159,6 +160,10 @@ app.post("/action", (req, res) => {
                         game.matchState = MatchState.WAITING
                     }
                 }
+                res.send({})
+            } else {
+                res.status(400)
+                res.send({ message: "bad action" })
             }
         }
     }
@@ -180,12 +185,14 @@ app.get("/state", (req, res) => {
 
 
 
-app.get("/", (req, res) => {
-    res.set("Connection", "close")
-    const file = fs.readFileSync("index.html")
-    res.setHeader("Content-Type", "text/html")
-    res.send(file)
-})
+// app.get("/", (req, res) => {
+//     res.set("Connection", "close")
+//     const file = fs.readFileSync("index.html")
+//     res.setHeader("Content-Type", "text/html")
+//     res.send(file)
+// })
+app.use(express.static('dist'))
+
 app.listen(PORT, () => {
     console.log("listening")
 })
