@@ -38,11 +38,11 @@ const setScreen = (screen) => {
         currentScreen.onExit()
     }
     currentScreen = screen
-    render()
     currentScreen.onEnter()
+    render()
 }
 const render = () => {
-    document.body.innerHTML = currentScreen.onRender()
+    currentScreen.renderNode.innerHTML = currentScreen.onRender()
     currentScreen.bindEvents()
 }
 
@@ -62,6 +62,7 @@ class GameScreen {
     onExit() {}
     onRender() {}
     bindEvents() {} // TODO: messy
+    renderNode = document.body  // reasonable default?
 }
 
 class MenuScreen extends GameScreen {
@@ -102,6 +103,7 @@ class MenuScreen extends GameScreen {
     }
 }
 class MatchScreen extends GameScreen {
+    renderNodeId = 'matchFloor'
     onEnter() {
         this.clickRestart = false // TODO: remove this entirely, use game state
         this.interval = setInterval(() => {
@@ -114,11 +116,13 @@ class MatchScreen extends GameScreen {
                 render()
             })
         }, 500)
+        document.body.innerHTML = this.renderMatch()
+        this.renderNode = $(this.renderNodeId)
     }
     onExit() {
         clearInterval(this.interval)
     }
-    renderMatch() {
+    onRender() {
         if (game.matchState == MatchState.PLAYING) {
             return "<p>Click to win!</p>" + game.players.map(p => `<p>${p.playerName} | ${p.score}</p>`).join("") + `<button id="play-button"}">play</button>`
         } else if (game.matchState == MatchState.WAITING) {
@@ -129,12 +133,11 @@ class MatchScreen extends GameScreen {
             <button id="exit-button">exit</button>` // TODO: exit button / maybe a restart button
         }
     }
-    onRender() {
+    renderMatch() {
         return `
         <h2>${playerName} (${playerId}) (${gameId})</h2>
         <h4>game state</h4>
-        ${this.renderMatch()}
-        <h2 id="player-turn"></h2>
+        <div id="${this.renderNodeId}"></div>
         `
     }
     bindEvents() {
