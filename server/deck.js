@@ -1,8 +1,8 @@
 // deck.js
 
-const Cards = require("./cards.js")
+import Cards from "./cards.js"
 
-module.exports = [
+export default [
     ...Array(4).fill(Cards.CAT_RAINBOW),
     ...Array(4).fill(Cards.CAT_BEARD),
     ...Array(4).fill(Cards.CAT_POTATO),

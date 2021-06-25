@@ -2,11 +2,14 @@
 
 /**/
 
-const express = require("express")
-const fs = require("fs")
+import express from "express"
+import Cards from "./cards.js"
+import DEFAULT_DECK from "./deck.js"
+
 const app = express()
 app.use(express.json())
-const PORT = 3000
+app.use(express.static("./dist/"))
+app.use(express.static("./server/"))
 
 const MatchState = {
     WAITING: 0,
@@ -14,11 +17,9 @@ const MatchState = {
     COMPLETE: 2
 }
 
-
+const PORT = 3000
 const A = 'A'.charCodeAt(0)
 const Z = 'Z'.charCodeAt(0) + 1
-const DEFAULT_DECK = require("./deck.js")
-const Cards = require("./cards.js")
 
 const makeGameId0 = () => String.fromCharCode(Math.floor(Math.random() * (Z - A) + A))
 const makeGameId = (n = 4) => Array.from({ length: n }).map(makeGameId0).join("")
@@ -47,41 +48,22 @@ const dealCards = () => {
     // shuffle the default deck and deal cards
     // returns [ [ hands... ], remainder ]
     // each hand has at least 1 defuse, and 3 bombs in remainder
-    
-    const deck = shuffle(DEFAULT_DECK)
-    const hands = [ [], [], [], [] ]
-    
-    // remove 4 defuse and give 1 to each player
-    let defuseCount = 0
-    for (let i = 0; i < deck.length; i += 1) {
-        if (deck[i] == Cards.DEFUSE) {
-            deck.splice(i, 1)
-            defuseCount += 1
-            if (defuseCount >= 4) {
-                break
-            }
-        }
-    }
-    hands[0].push(Cards.DEFUSE)
-    hands[1].push(Cards.DEFUSE)
-    hands[2].push(Cards.DEFUSE)
-    hands[3].push(Cards.DEFUSE)
-    
-    console.log(deck)
-    console.log(hands)
+
+    // remove all bombs and all but 2 defuses, and shuffle
+    let deck = DEFAULT_DECK.filter(c => c != Cards.DEFUSE && c != Cards.BOMB)
+    deck.push(Cards.DEFUSE, Cards.DEFUSE) // add 2 defuses back in
+    deck = shuffle(deck)
+    const hands = [ [Cards.DEFUSE], [Cards.DEFUSE], [Cards.DEFUSE], [Cards.DEFUSE] ]
     
     // deal each hand 7 cards (they already had a defuse, so 6 each)
     for (let hand of hands) {
         while (hand.length < 7) {
-            const card = deck.shift()
-            if (card != Cards.BOMB) {
-                hand.push(card)
-            }
+            hand.push(deck.shift())
         }
     }
 
     // shuffle the remainder again
-    const remainder = shuffle(shuffle([ ...deck, Cards.BOMB, Cards.BOMB, Cards.BOMB ]))
+    const remainder = shuffle([ ...deck, Cards.BOMB, Cards.BOMB, Cards.BOMB ])
 
     return [ hands, remainder ]
 }
@@ -96,7 +78,7 @@ const createGame = (playerName) => {
         remainder: []
     }
 
-    // shuffle deck and deal cards
+    // deal cards
     const [ hands, remainder ] = dealCards()
     game.hands = hands
     game.remainder = remainder
@@ -122,7 +104,11 @@ app.get("/create-game", (req, res) => {
     games[gameId] = game
 
     // the calling player joins immediately
-    res.send({ gameId: gameId, playerId: game.players[0].playerId })
+    res.send({
+        gameId: gameId,
+        playerId: game.players[0].playerId,
+        playerIndex: 0
+    })
 })
 
 
@@ -130,7 +116,9 @@ app.get("/create-game", (req, res) => {
 app.get("/join", (req, res) => {
     res.set("Connection", "close")
     const gameId = req.query["gameId"]
-    const game = games[gameId]
+    // const game = games[gameId]
+    const game = Object.values(games)[0]
+    console.log(game)
     if (!game) {
         res.status(400)
         res.send({ message: "game not found" })
@@ -146,7 +134,10 @@ app.get("/join", (req, res) => {
             if (game.players.length == 4) {
                 game.matchState = MatchState.PLAYING
             }
-            res.send({ playerId: game.players[game.players.length - 1].playerId }) // TODO: return immediate state
+            res.send({
+                playerId: game.players[game.players.length - 1].playerId,
+                playerIndex: game.players.length - 1
+            }) // TODO: return immediate game state?
         }
     }
 })
@@ -183,7 +174,8 @@ app.post("/action", (req, res) => {
     // Player performed an action
     // { "action": "...", "playerId": "..." }
     const gameId = req.body["gameId"]
-    const game = games[gameId]
+    //const game = games[gameId]
+    const game = Object.values(games)[0]
     if (!game) {
         res.status(400)
         res.send({ message: "game not found" })
@@ -198,14 +190,11 @@ app.post("/action", (req, res) => {
             res.send({ message: "bad player id" })
         } else if (game.matchState == MatchState.PLAYING) {
             if (action == "play") {
-                player.score += 1
-                if (player.score >= 10) {
-                    // victory!
-                    game.winner = player.playerName
-                    game.matchState = MatchState.COMPLETE
-                }
-                // game.scores[id] += 1
-                // else if action == "..." {}
+                const playerIndex = game.players.findIndex(p => p.playerId == playerId)
+                const cardIndex = req.body["cardIndex"]
+                const card = game.hands[playerIndex][cardIndex]
+                game.hands[playerIndex].splice(cardIndex, 1)
+                game.discard.push(card)
                 res.send({ message: "ok" })
             } else {
                 res.status(400)
@@ -241,7 +230,8 @@ app.get("/state", (req, res) => {
     // Player requesting state update
     res.setHeader("cache-control", "no-store")
     const gameId = req.query["gameId"]
-    const game = games[gameId]
+    // const game = games[gameId]
+    const game = Object.values(games)[0]
     if (!game) {
         res.status(400)
         res.send({ message: "game not found" })
@@ -249,16 +239,6 @@ app.get("/state", (req, res) => {
         res.send(game)
     }
 })
-
-
-
-// app.get("/", (req, res) => {
-//     res.set("Connection", "close")
-//     const file = fs.readFileSync("index.html")
-//     res.setHeader("Content-Type", "text/html")
-//     res.send(file)
-// })
-app.use(express.static('dist'))
 
 app.listen(PORT, () => {
     console.log("listening")

@@ -2,6 +2,9 @@
 // Main script
 // ==================
 
+// const Cards = import("/cards.js")
+import Cards from "/cards.js"
+
 const MatchState = {
     WAITING: 0,
     PLAYING: 1,
@@ -38,8 +41,8 @@ const setScreen = (screen) => {
         currentScreen.onExit()
     }
     currentScreen = screen
-    render()
     currentScreen.onEnter()
+    render()
 }
 const render = () => {
     document.body.innerHTML = currentScreen.onRender()
@@ -48,11 +51,13 @@ const render = () => {
 
 
 let playerId = null
+let playerIndex = -1
 let gameId = ""
 let playerName = ""
 let game = {
     matchState: MatchState.WAITING,
     players: [],
+    hands: [],
     winner: ""
 }
 
@@ -74,6 +79,7 @@ class MenuScreen extends GameScreen {
             gameId = $("game-id-input").value
             apiGet("/join", { playerName, gameId }).then(res => {
                 playerId = res.playerId
+                playerIndex = res.playerIndex
                 setScreen(new MatchScreen())
             }).catch(alert)
         })
@@ -83,6 +89,7 @@ class MenuScreen extends GameScreen {
             playerName = $("name-input").value
             apiGet("/create-game", { playerName }).then(res => {
                 playerId = res.playerId
+                playerIndex = res.playerIndex
                 gameId = res.gameId
                 setScreen(new MatchScreen())
             }).catch(alert) // TODO: not very helpful
@@ -120,7 +127,17 @@ class MatchScreen extends GameScreen {
     }
     renderMatch() {
         if (game.matchState == MatchState.PLAYING) {
-            return "<p>Click to win!</p>" + game.players.map(p => `<p>${p.playerName} | ${p.score}</p>`).join("") + `<button id="play-button"}">play</button>`
+            //return "<p>Click to win!</p>" + game.players.map(p => `<p>${p.playerName} | ${p.score}</p>`).join("") + `<button id="play-button"}">play</button>`
+            return `<div>
+                ${game.hands[playerIndex].reduce((v, c, i) => v + `<button id="hand-card-${i}">${c.name}</button>`, "")}
+            </div>
+            <div><span>Remainder</span>
+                ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+            </div>
+            <div><span>Discard</span>
+                ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+            </div>
+            `
         } else if (game.matchState == MatchState.WAITING) {
             return "<p>Waiting for 4 players...</p>"
         } else {
@@ -138,6 +155,21 @@ class MatchScreen extends GameScreen {
         `
     }
     bindEvents() {
+        if (game && game.hands.length) {
+            for (let i = 0; i < game.hands[playerIndex].length; i++) {
+                $(`hand-card-${i}`).addEventListener("click", () => {
+                    // alert(`click: ${game.hands[playerIndex][i].name}`)
+                    apiPost("/action", {
+                        action: "play",
+                        playerId: playerId,
+                        cardIndex: i
+                    }).then({
+                        
+                    })
+                })
+            }
+        }
+
         $("play-button")?.addEventListener("click", () => {
             console.log("CLICK")
             apiPost("/action", { gameId, playerId, action: "play" })
