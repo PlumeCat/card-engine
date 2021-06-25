@@ -30,7 +30,7 @@ const nextId = (() => {
         return _
     }
 })()
-const createPlayer = (playerName, score = 0, ready = false) => ({ playerId: nextId(), playerName, score, ready })
+const createPlayer = (playerName, score = 0, ready = false) => ({ playerId: nextId(), playerName, score, ready, handIdx: null })
 
 const shuffle = (deck) => {
     const newDeck = deck.slice()
@@ -144,6 +144,7 @@ app.get("/join", (req, res) => {
             console.log(`Player joined: ${playerName}`)
             game.players.push(createPlayer(playerName))
             if (game.players.length == 4) {
+                game.players.map((p, i) => p.handIdx = i)
                 game.matchState = MatchState.PLAYING
             }
             res.send({ playerId: game.players[game.players.length - 1].playerId }) // TODO: return immediate state
@@ -220,6 +221,7 @@ app.post("/action", (req, res) => {
                     game.players.forEach(p => {
                         p.score = 0,
                         p.ready = false
+                        // p.handIdx = null  // todo ???
                     })
                     if (game.players.length === 4) {
                         game.matchState = MatchState.PLAYING

@@ -1,0 +1,44 @@
+body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+}
+
+#matchStage {
+    width: 100%;
+    height: 100%;
+    background-color: #35654d;
+}
+
+#playerHand {
+    position: absolute;
+    bottom: 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+}
+
+#playerHandActions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.fuCard {
+    padding: 20px;
+    background-color: #fff;
+    width: 50px;
+    height: 75px;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+}
+.fuCard:hover {
+    border: 2px solid orange;
+}
+.fuCardSelected, .fuCardSelected:hover {
+    border: 2px solid red;
+}
