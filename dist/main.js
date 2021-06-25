@@ -45,13 +45,12 @@ const setScreen = (screen) => {
     render()
 }
 const render = () => {
-    document.body.innerHTML = currentScreen.onRender()
+    currentScreen.renderNode.innerHTML = currentScreen.onRender()
     currentScreen.bindEvents()
 }
 
 
 let playerId = null
-let playerIndex = -1
 let gameId = ""
 let playerName = ""
 let game = {
@@ -67,6 +66,7 @@ class GameScreen {
     onExit() {}
     onRender() {}
     bindEvents() {} // TODO: messy
+    renderNode = document.body  // reasonable default?
 }
 
 class MenuScreen extends GameScreen {
@@ -79,7 +79,6 @@ class MenuScreen extends GameScreen {
             gameId = $("game-id-input").value
             apiGet("/join", { playerName, gameId }).then(res => {
                 playerId = res.playerId
-                playerIndex = res.playerIndex
                 setScreen(new MatchScreen())
             }).catch(alert)
         })
@@ -89,7 +88,6 @@ class MenuScreen extends GameScreen {
             playerName = $("name-input").value
             apiGet("/create-game", { playerName }).then(res => {
                 playerId = res.playerId
-                playerIndex = res.playerIndex
                 gameId = res.gameId
                 setScreen(new MatchScreen())
             }).catch(alert) // TODO: not very helpful
@@ -97,48 +95,66 @@ class MenuScreen extends GameScreen {
     }
     onRender() {
         return `
-        <h2>exploding kittens</h2>
-        <span>player name:</span><input id="name-input"/>
-        <br>
-        <span>game ID:</span><input id="game-id-input"/>
-        <br>
-        <button id="join-button">join</button>
-        <br>
-        <button id="create-button">create</button>
+        <div>
+            <h2>exploding kittens</h2>
+            <span>player name:</span><input id="name-input"/>
+            <br>
+            <span>game ID:</span><input id="game-id-input"/>
+            <br>
+            <button id="join-button">join</button>
+            <br>
+            <button id="create-button">create</button>
+        </div>
         `
     }
 }
 class MatchScreen extends GameScreen {
+    renderNodeId = 'matchFloor'
     onEnter() {
         this.clickRestart = false // TODO: remove this entirely, use game state
         this.interval = setInterval(() => {
             // query state
             apiGet("/state", { gameId }).then(newState => {
-                game = newState
-                if (game.matchState != MatchState.COMPLETE) {
-                    this.clickRestart = false
+                if (game.matchState !== newState.matchState ||
+                    !objEqual(game.hands, newState.hands) ||
+                    !objEqual(game.players, newState.players)) {
+                    game = newState
+                    if (game.matchState != MatchState.COMPLETE) {
+                        this.clickRestart = false
+                    }
+                    render()
                 }
-                render()
             })
         }, 500)
+        document.body.innerHTML = this.renderMatch()
+        this.renderNode = $(this.renderNodeId)
     }
     onExit() {
         clearInterval(this.interval)
     }
-    renderMatch() {
+
+    onRender() {
         if (game.matchState == MatchState.PLAYING) {
-            //return "<p>Click to win!</p>" + game.players.map(p => `<p>${p.playerName} | ${p.score}</p>`).join("") + `<button id="play-button"}">play</button>`
+            //     =======
+            //             `<div id='playerHand'>
+            //         <div id='playerHandActions'><button id="play-button">play</button></div>
+            //      </div>`
+            // //${game.hands[
+            //     playerIndex
+            // ].map((c, i) => this.renderCard(c, i)).join('')}
             return `<div>
-                ${game.hands[playerIndex].reduce((v, c, i) => v + `<button id="hand-card-${i}">${c.name}</button>`, "")}
-            </div>
-            <div><span>Remainder</span>
+            ${game.hands[game.players.find(p => p.playerId === playerId).handIndex].reduce((v, c, i) => v + this.renderCard(c, i), "")}
+                </div>
+                <div><span>Remainder</span>
                 ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-            </div>
-            <div><span>Discard</span>
+                </div>
+                <div><span>Discard</span>
                 ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-            </div>
-            `
-        } else if (game.matchState == MatchState.WAITING) {
+                </div>
+                `
+            } else if (game.matchState == MatchState.WAITING) {
+
+
             return "<p>Waiting for 4 players...</p>"
         } else {
             return `<p>Game over! Winner: ${game.winner}</p>
@@ -146,19 +162,24 @@ class MatchScreen extends GameScreen {
             <button id="exit-button">exit</button>` // TODO: exit button / maybe a restart button
         }
     }
-    onRender() {
+    renderCard(c, i) {
         return `
-        <h2>${playerName} (${playerId}) (${gameId})</h2>
-        <h4>game state</h4>
-        ${this.renderMatch()}
-        <h2 id="player-turn"></h2>
+        <div id="hand-card-${i}" class="fuCard fuCard${c.value}">${c.name}</div>`
+    }
+    renderMatch() {
+        return `
+        <div id="matchStage">
+            <h2>${playerName} (${playerId}) (${gameId})</h2>
+            <div id="${this.renderNodeId}"></div>
+        </div>
         `
     }
     bindEvents() {
         if (game && game.hands.length) {
-            for (let i = 0; i < game.hands[playerIndex].length; i++) {
-                $(`hand-card-${i}`).addEventListener("click", () => {
-                    // alert(`click: ${game.hands[playerIndex][i].name}`)
+            for (let i = 0; i < game.hands[game.players.find(p => p.playerId === playerId).handIndex].length; i++) {
+                $(`hand-card-${i}`).addEventListener("click", (e) => {
+                    document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+                    e.target.classList.add('fuCardSelected')
                     apiPost("/action", {
                         action: "play",
                         playerId: playerId,
@@ -192,3 +213,54 @@ class MatchScreen extends GameScreen {
 document.addEventListener("DOMContentLoaded", () => {
     setScreen(new MenuScreen())
 })
+
+
+const objEqual = (a, b) => {
+    const isArr = Array.isArray(a)
+    const bIsArr = Array.isArray(b)
+
+    if (isArr !== bIsArr) {
+        return false
+    }
+
+    if (isArr) {
+        if (a.length !== b.length) {
+            return false
+        }
+        for (let i=0; i<a.length; i++) {
+            if (!_isObjEqual(a[i], b[i])) {
+                return false
+            }
+        }
+    }
+    else {
+        if (Object.keys(a).length !== Object.keys(b).length) {
+            return false
+        }
+        for (let key of Object.keys(a)) {
+            if (!b.hasOwnProperty(key)) {
+                return false
+            }
+        }
+        for (let key of Object.keys(a)) {
+            if (!_isObjEqual(a[key], b[key])) {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+
+const _isObjEqual = (a, b) => {
+    if (_isObject(a)) {
+        if (_isObject(b)) {
+            return objEqual(a, b)
+        }
+        return false
+    }
+    return a === b
+}
+
+
+const _isObject = obj => obj === Object(obj)

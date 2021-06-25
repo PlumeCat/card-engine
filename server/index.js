@@ -106,8 +106,7 @@ app.get("/create-game", (req, res) => {
     // the calling player joins immediately
     res.send({
         gameId: gameId,
-        playerId: game.players[0].playerId,
-        playerIndex: 0
+        playerId: game.players[0].playerId
     })
 })
 
@@ -133,10 +132,10 @@ app.get("/join", (req, res) => {
             game.players.push(createPlayer(playerName))
             if (game.players.length == 4) {
                 game.matchState = MatchState.PLAYING
+                game.players.forEach((p, i) => {  p.handIndex = i })
             }
             res.send({
-                playerId: game.players[game.players.length - 1].playerId,
-                playerIndex: game.players.length - 1
+                playerId: game.players[game.players.length - 1].playerId
             }) // TODO: return immediate game state?
         }
     }
@@ -190,10 +189,9 @@ app.post("/action", (req, res) => {
             res.send({ message: "bad player id" })
         } else if (game.matchState == MatchState.PLAYING) {
             if (action == "play") {
-                const playerIndex = game.players.findIndex(p => p.playerId == playerId)
                 const cardIndex = req.body["cardIndex"]
-                const card = game.hands[playerIndex][cardIndex]
-                game.hands[playerIndex].splice(cardIndex, 1)
+                const card = game.hands[player.handIndex][cardIndex]
+                game.hands[player.handIndex].splice(cardIndex, 1)
                 game.discard.push(card)
                 res.send({ message: "ok" })
             } else {
