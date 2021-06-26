@@ -110,6 +110,7 @@ class MenuScreen extends GameScreen {
 }
 class MatchScreen extends GameScreen {
     renderNodeId = 'matchFloor'
+    selectedCards = []  // todo ensure to reset this when necessary
     get hand() {
         return game.hands[game.players.find(p => p.playerId === playerId).handIndex] || []
     }
@@ -154,33 +155,41 @@ class MatchScreen extends GameScreen {
                             ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
                         </div>
                     </div>
-                    <button id="pick-button">pick</button>
-                    <button id="play-button">play</button>
-                </div>
-                <div id='playerHandCont'>
-                    <div class="playerHandAligner"></div>
-                    <div id='playerHand'>
-                        ${this.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
+                    <div id="matchPlayAreaActions">
+                        <button id="pick-button">pick</button>
                     </div>
-                    <div class="playerHandAligner"></div>
+                </div>
+                <div id='playerSection'>
+                    <div id='playerHandCont'>
+                        <div class="playerHandAligner"></div>
+                        <div id='playerHand'>
+                            ${this.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
+                        </div>
+                        <div class="playerHandAligner"></div>
+                    </div>
+                    <div id="playerHandActionsCont">
+                        <div id="playerHandActions">
+                            <button id="play-button">play</button>
+                        </div>
+                        <div id="playerInfo">${playerName} (${playerId}) (${gameId})</div>
+                    </div>
                 </div>
                 `
         } else if (game.matchState === MatchState.WAITING) {
-            return "<p>Waiting for 4 players...</p>"
+            return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p>`
         } else {
-            return `<p>Game over! Winner: ${game.winner}</p>
+            return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Game over! Winner: ${game.winner}</p>
             ${this.clickRestart ? `<span>waiting for other players...</span>` : `<button id="restart-button">play again</button>`}
             <button id="exit-button">exit</button>` // TODO: exit button / maybe a restart button
         }
     }
     renderCard(c, i) {
         return `
-        <div id="hand-card-${i}" class="fuCard fuCard${c.value}">${c.name}</div>`
+        <div id="hand-card-${i}" class="fuCard fuCard${c.value}">${c.displayName || c.name.replace('_', ' ')}</div>`
     }
     renderMatch() {
         return `
         <div id="matchStage">
-            <h2>${playerName} (${playerId}) (${gameId})</h2>
             <div id="${this.renderNodeId}"></div>
         </div>
         `
@@ -189,27 +198,37 @@ class MatchScreen extends GameScreen {
         if (game && game.hands.length) {
             for (let i = 0; i < this.hand.length; i++) {
                 $(`hand-card-${i}`).addEventListener("click", (e) => {
-                    document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
-                    e.target.classList.add('fuCardSelected')
-                    apiPost("/action", {
-                        action: "play",
-                        playerId: playerId,
-                        cardIndex: i
-                    }).catch(alert)
+                    if (this.selectedCards.includes(i)) {
+                        this.selectedCards = this.selectedCards.filter(c => c!== i)
+                        e.target.classList.remove('fuCardSelected')
+                    }
+                    else {
+                        this.selectedCards.push(i)
+                        e.target.classList.add('fuCardSelected')
+                    }
                 })
             }
-
-            $("pick-button")?.addEventListener("click", e => {
-                apiPost("/action", {
-                    action: "pick",
-                    playerId: playerId
-                }).catch(alert)
-            })
         }
 
+        $("pick-button")?.addEventListener("click", e => {
+            apiPost("/action", {
+                action: "pick",
+                gameId: gameId,
+                playerId: playerId
+            }).catch(alert)
+        })
+
         $("play-button")?.addEventListener("click", () => {
-            console.log("CLICK")
-            apiPost("/action", { gameId, playerId, action: "play", cardIndices: [ 0, 1 ] })
+            console.log("PLAY")
+            apiPost("/action", {
+                action: "play",
+                gameId: gameId,
+                playerId: playerId,
+                cardIndices: this.selectedCards
+            }).then(() => {
+                this.selectedCards = []
+                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+            }).catch(alert)
         })
 
         $("restart-button")?.addEventListener("click", () => {
