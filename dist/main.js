@@ -140,23 +140,30 @@ class MatchScreen extends GameScreen {
     onRender() {
         if (game.matchState === MatchState.PLAYING) {
             return `
-                <div id="matchPlayArea">
-                    <div class="matchCardStackCont" id="matchDiscardStack">
-                        <span>Discard</span>
-                        <hr>
-                        <div class="matchCardStack">
-                            ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                <div id="matchPlayCont">
+                    <div id="matchPlayersTop">${this.renderOppHand('top')}</div>
+                    <div id="matchPlayBottom">
+                        <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
+                        <div id="matchPlayArea">
+                            <div class="matchCardStackCont" id="matchDiscardStack">
+                                <span>Discard</span>
+                                <hr>
+                                <div class="matchCardStack">
+                                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                                </div>
+                            </div>
+                            <div class="matchCardStackCont" id="matchRemStack">
+                                <span>Deck</span>
+                                <hr>
+                                <div class="matchCardStack">
+                                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                                </div>
+                            </div>
+                            <div id="matchPlayAreaActions">
+                                <button id="pick-button">pick</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="matchCardStackCont" id="matchRemStack">
-                        <span>Deck</span>
-                        <hr>
-                        <div class="matchCardStack">
-                            ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                        </div>
-                    </div>
-                    <div id="matchPlayAreaActions">
-                        <button id="pick-button">pick</button>
+                        <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
                     </div>
                 </div>
                 <div id='playerSection'>
@@ -171,7 +178,7 @@ class MatchScreen extends GameScreen {
                         <div id="playerHandActions">
                             <button id="play-button">play</button>
                         </div>
-                        <div id="playerInfo">${playerName} (${playerId}) (${gameId})</div>
+                        <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                     </div>
                 </div>
                 `
@@ -185,7 +192,19 @@ class MatchScreen extends GameScreen {
     }
     renderCard(c, i) {
         return `
-        <div id="hand-card-${i}" class="fuCard fuCard${c.value}">${c.displayName || c.name.replace('_', ' ')}</div>`
+        <div id="hand-card-${i}" class="fuCard fuCard${c.name.split('_').pop().substr(0, 3)}">
+            <div class="fuCardInner">
+                ${c.displayName || c.name.replace('_', ' ')}
+            </div>
+        </div>`
+    }
+    renderOppHand(pos) {
+        const n = {left: 1, top: 2, right: 3}[pos]
+        const player = game.players[(game.players.findIndex(p => p.playerId === playerId) + n) % 4]
+        const len = game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
+        return `
+            <div><div class="fdCard fdCardOpp">x${len}</div><div class="playerInfo">${player.playerName}</div></div>
+        `
     }
     renderMatch() {
         return `
@@ -200,11 +219,11 @@ class MatchScreen extends GameScreen {
                 $(`hand-card-${i}`).addEventListener("click", (e) => {
                     if (this.selectedCards.includes(i)) {
                         this.selectedCards = this.selectedCards.filter(c => c!== i)
-                        e.target.classList.remove('fuCardSelected')
+                        $(`hand-card-${i}`).classList.remove('fuCardSelected')
                     }
                     else {
                         this.selectedCards.push(i)
-                        e.target.classList.add('fuCardSelected')
+                        $(`hand-card-${i}`).classList.add('fuCardSelected')
                     }
                 })
             }
