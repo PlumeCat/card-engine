@@ -135,27 +135,20 @@ class MatchScreen extends GameScreen {
 
     onRender() {
         if (game.matchState == MatchState.PLAYING) {
-            //     =======
-            //             `<div id='playerHand'>
-            //         <div id='playerHandActions'><button id="play-button">play</button></div>
-            //      </div>`
-            // //${game.hands[
-            //     playerIndex
-            // ].map((c, i) => this.renderCard(c, i)).join('')}
-            return `<div>
-            ${game.hands[game.players.find(p => p.playerId === playerId).handIndex].reduce((v, c, i) => v + this.renderCard(c, i), "")}
+            return `
+                <div id="playerHand">
+                    ${game.hands[game.players.find(p => p.playerId === playerId).handIndex].reduce((v, c, i) => v + this.renderCard(c, i), "")}
+                    <button id="pick-button">pick</button>
                 </div>
                 <div><span>Remainder</span>
-                ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
                 </div>
                 <div><span>Discard</span>
-                ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
                 </div>
-                `
-            } else if (game.matchState == MatchState.WAITING) {
-
-
-            return "<p>Waiting for 4 players...</p>"
+            `
+        } else if (game.matchState == MatchState.WAITING) {
+            return `<p>Waiting for 4 players...</p>`
         } else {
             return `<p>Game over! Winner: ${game.winner}</p>
             ${this.clickRestart ? `<span>waiting for other players...</span>` : `<button id="restart-button">play again</button>`}
@@ -187,6 +180,13 @@ class MatchScreen extends GameScreen {
                     }).catch(alert)
                 })
             }
+
+            $("pick-button")?.addEventListener("click", e => {
+                apiPost("/action", {
+                    action: "pick",
+                    playerId: playerId
+                })
+            })
         }
 
         $("play-button")?.addEventListener("click", () => {

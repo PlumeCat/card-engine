@@ -105,7 +105,7 @@ app.get("/create-game", (req, res) => {
     games[gameId] = game
 
     // the calling player joins immediately
-    res.send({
+    return res.status(200).send({
         gameId: gameId,
         playerId: game.players[0].playerId
     })
@@ -120,128 +120,120 @@ app.get("/join", (req, res) => {
     const game = Object.values(games)[0]
     console.log(game)
     if (!game) {
-        res.status(400)
-        res.send({ message: "game not found" })
-    } else {
-        if (game.players.length > 3) {
-            console.log("Rejected connection, too many players: " + req.query["playerName"])
-            res.status(400)
-            res.send({ message: "too many players" })
-        } else {
-            const playerName = req.query["playerName"]
-            console.log(`Player joined: ${playerName}`)
-            game.players.push(createPlayer(playerName))
-            if (game.players.length == 4) {
-                game.matchState = MatchState.PLAYING
-                game.players.forEach((p, i) => {  p.handIndex = i })
-            }
-            res.send({
-                playerId: game.players[game.players.length - 1].playerId
-            }) // TODO: return immediate game state?
-        }
+        return res.status(400).send({ message: "game not found" })
     }
+    if (game.players.length > 3) {
+        console.log("Rejected connection, too many players: " + req.query["playerName"])
+        return res.status(400).send({ message: "too many players" })
+    }
+    
+    const playerName = req.query["playerName"]
+    console.log(`Player joined: ${playerName}`)
+    game.players.push(createPlayer(playerName))
+    if (game.players.length == 4) {
+        game.matchState = MatchState.PLAYING
+        game.players.forEach((p, i) => {  p.handIndex = i })
+    }
+    return res.status(200).send({
+        playerId: game.players[game.players.length - 1].playerId
+    }) // TODO: return immediate game state?
 })
 
 app.get("/leave", (req, res) => {
     res.set("Connection", "close")
     const gameId = req.query["gameId"]
     const playerId = parseInt(req.query["playerId"])
-    // TODO...
     const game = games[gameId]
     if (!game) {
-        res.status(400)
-        res.send({ message: "game not found" })
-    } else {
-        // delete the player that left
-        game.players = game.players.filter(p => p.playerId != playerId)
-        // COMPLETE => COMPLETE
-        // WAITING => WAITING
-        // PLAYING => WAITING
-        if (game.matchState == MatchState.PLAYING) {
-            // TODO: abort game, go back to waiting state  (until we can automate turns for missing/disconnected players)
-            game.matchState = MatchState.WAITING
-            game.players.forEach(p => {
-                p.ready = false
-            })
-        }
-        res.send({ message: "left game" })
+        return res.status(400).send({ message: "game not found" })
     }
+    
+    // delete the player that left
+    game.players = game.players.filter(p => p.playerId != playerId)
+    
+    // COMPLETE => COMPLETE
+    // WAITING => WAITING
+    // PLAYING => WAITING
+    if (game.matchState == MatchState.PLAYING) {
+        // TODO: abort game, go back to waiting state  (until we can automate turns for missing/disconnected players)
+        game.matchState = MatchState.WAITING
+        game.players.forEach(p => {
+            p.ready = false
+        })
+    }
+    return res.status(200).send({ message: "left game" })
 })
 
 app.post("/action", (req, res) => {
     res.set("Connection", "close")
-    // Player performed an action
-    // { "action": "...", "playerId": "..." }
     const gameId = req.body["gameId"]
     //const game = games[gameId]
     const game = Object.values(games)[0]
     if (!game) {
-        res.status(400)
-        res.send({ message: "game not found" })
-    } else {
-        // TODO: filter by match state
-        const action = req.body["action"]
-        const playerId = parseInt(req.body["playerId"])
-        console.log(`Player: ${playerId}, action: ${action}`)
-        const playerIndex = game.players.findIndex(p => p.playerId == playerId)
-        const player = game.players[playerIndex]
-        if (!player) {
-            res.status(400)
-            res.send({ message: "bad player id" })
-        } else if (game.matchState == MatchState.PLAYING) {
-            if (action == "play") {
-                if (playerIndex != game.playerTurn) {
-                    res.status(400)
-                    res.send({ message: "not your turn" })
+        return res.status(400).send({ message: "game not found" })
+    }
+    
+    const action = req.body["action"]
+    const playerId = parseInt(req.body["playerId"])
+    console.log(`Player: ${playerId}, action: ${action}`)
+    const playerIndex = game.players.findIndex(p => p.playerId == playerId)
+    const player = game.players[playerIndex]
+    if (!player) {
+        return res.status(400).send({ message: "bad player id" })
+    }
+    
+    if (game.matchState == MatchState.PLAYING) {
+        if (action == "play") {
+            if (playerIndex != game.playerTurn) {
+                return res.status(400).send({ message: "not your turn" })
+            }
+            const cardIndex = req.body["cardIndex"]
+            const card = game.hands[player.handIndex][cardIndex]
+            game.hands[player.handIndex].splice(cardIndex, 1)
+            game.discard.push(card)
+            return res.status(200).send({ message: "ok" })
+        } else if (action == "pick") {
+            if (playerIndex != game.playerTurn){
+                return res.status(400).send({ message: "not your turn" })
+            }
+            if (game.remainder.length) {
+                game.hands[player.handIndex].push(game.remainder.shift())
+            }
+            game.playerTurn = (game.playerTurn + 1) % 4
+            return res.status(200).send({ message: "ok" })
+        }
+    } else if (game.matchState == MatchState.COMPLETE) {
+        if (action == "restart") {
+            player.ready = true
+            // are all players ready?
+            if (game.players.every(p => p.ready)) {
+                // TODO: reset match state, deal new cards etc
+                game.players.forEach(p => {
+                    p.ready = false
+                })
+                if (game.players.length === 4) {
+                    game.matchState = MatchState.PLAYING
                 } else {
-                    const cardIndex = req.body["cardIndex"]
-                    const card = game.hands[player.handIndex][cardIndex]
-                    game.hands[player.handIndex].splice(cardIndex, 1)
-                    game.discard.push(card)
-                    game.playerTurn = (game.playerTurn + 1) % 4 // next player
-                    res.send({ message: "ok" })
+                    game.matchState = MatchState.WAITING
                 }
-            } else {
-                res.status(400)
-                res.send({ message: "bad action" })
             }
-        } else if (game.matchState == MatchState.COMPLETE) {
-            if (action == "restart") {
-                player.ready = true
-                // are all players ready?
-                if (game.players.every(p => p.ready)) {
-                    // TODO: reset match state, deal new cards etc
-                    game.players.forEach(p => {
-                        p.ready = false
-                    })
-                    if (game.players.length === 4) {
-                        game.matchState = MatchState.PLAYING
-                    } else {
-                        game.matchState = MatchState.WAITING
-                    }
-                }
-                res.send({ message: "will restart" })
-            }
-        } else {
-            res.status(400)
-            res.send({ message: "bad action" })
+            return res.status(200).send({ message: "will restart" })
         }
     }
+    return res.status(400).send({ message: "bad action" })
 })
 
 app.get("/state", (req, res) => {
     res.set("Connection", "close")
-    // Player requesting state update
     res.setHeader("cache-control", "no-store")
+
     const gameId = req.query["gameId"]
     // const game = games[gameId]
     const game = Object.values(games)[0]
     if (!game) {
-        res.status(400)
-        res.send({ message: "game not found" })
-    } else {
-        res.send(game)
+        return res.status(400).send({ message: "game not found" })
     }
+    return res.status(200).send(game)
 })
 
 app.listen(PORT, () => {
