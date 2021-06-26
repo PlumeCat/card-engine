@@ -183,7 +183,7 @@ Reclaiming a card:
 
 
 Receiving a card
-    <!-- Targeted player has to click one of their cards; it is given to the other player -->
+    <!-- Combo X2: Targeted player has to click one of their cards; it is given to the other player -->
     <!-- Nobody else sees the card -->
     Timer
         -> End of play
@@ -217,10 +217,10 @@ Bomb defusing
     <!-- Show the slider UI to the player so they can pick a position in the deck to reinsert the bomb, and maybe a "random" button -->
     Submitted the slider
         <!-- Insert the bomb in the cards at the player's chosen position -->
-        -> Start of turn <!-- next player -->
+        -> End of turn <!-- next player -->
     Timer
         <!-- Insert randomly -->
-        -> Start of turn <!-- next player -->
+        -> End of turn <!-- next player -->
 
 
 End of turn
