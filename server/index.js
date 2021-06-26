@@ -31,7 +31,7 @@ const nextId = (() => {
         return _
     }
 })()
-const createPlayer = (playerName, score = 0, ready = false) => ({ playerId: nextId(), playerName, score, ready })
+const createPlayer = (playerName, ready = false) => ({ playerId: nextId(), playerName, ready })
 
 const shuffle = (deck) => {
     const newDeck = deck.slice()
@@ -73,6 +73,7 @@ const createGame = (playerName) => {
         winner: "",
         matchState: MatchState.WAITING,
         players: [ createPlayer(playerName) ],
+        playerTurn: 0,
         hands: [],
         discard: [],
         remainder: []
@@ -160,7 +161,6 @@ app.get("/leave", (req, res) => {
             // TODO: abort game, go back to waiting state  (until we can automate turns for missing/disconnected players)
             game.matchState = MatchState.WAITING
             game.players.forEach(p => {
-                p.score = 0
                 p.ready = false
             })
         }
@@ -205,7 +205,6 @@ app.post("/action", (req, res) => {
                 if (game.players.every(p => p.ready)) {
                     // TODO: reset match state, deal new cards etc
                     game.players.forEach(p => {
-                        p.score = 0,
                         p.ready = false
                     })
                     if (game.players.length === 4) {
