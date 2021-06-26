@@ -197,7 +197,7 @@ app.post("/action", (req, res) => {
             }
             // remove the played cards from the hand
             game.hands[player.handIndex] = game.hands[player.handIndex].filter(
-                (c, i) => -1 == cardIndices.indexOf(i)
+                (c, i) => !cardIndices.includes(i)
             )
 
             // const card = game.hands[player.handIndex][cardIndex]
