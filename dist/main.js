@@ -155,6 +155,7 @@ class MatchScreen extends GameScreen {
                         </div>
                     </div>
                     <button id="pick-button">pick</button>
+                    <button id="play-button">play</button>
                 </div>
                 <div id='playerHandCont'>
                     <div class="playerHandAligner"></div>
@@ -208,7 +209,7 @@ class MatchScreen extends GameScreen {
 
         $("play-button")?.addEventListener("click", () => {
             console.log("CLICK")
-            apiPost("/action", { gameId, playerId, action: "play" })
+            apiPost("/action", { gameId, playerId, action: "play", cardIndices: [ 0, 1 ] })
         })
 
         $("restart-button")?.addEventListener("click", () => {

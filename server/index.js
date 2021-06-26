@@ -187,10 +187,22 @@ app.post("/action", (req, res) => {
             if (playerIndex != game.playerTurn) {
                 return res.status(400).send({ message: "not your turn" })
             }
-            const cardIndex = req.body["cardIndex"]
-            const card = game.hands[player.handIndex][cardIndex]
-            game.hands[player.handIndex].splice(cardIndex, 1)
-            game.discard.push(card)
+            
+            //const cardIndex = req.body["cardIndex"]
+            const cardIndices = req.body["cardIndices"]
+            
+            // add the played cards to discard pile
+            for (let c of cardIndices) {
+                game.discard.push(game.hands[player.handIndex][c])
+            }
+            // remove the played cards from the hand
+            game.hands[player.handIndex] = game.hands[player.handIndex].filter(
+                (c, i) => -1 == cardIndices.indexOf(i)
+            )
+
+            // const card = game.hands[player.handIndex][cardIndex]
+            // game.hands[player.handIndex].splice(cardIndex, 1)
+            // game.discard.push(card)
             return res.status(200).send({ message: "ok" })
         } else if (action == "pick") {
             if (playerIndex != game.playerTurn){
