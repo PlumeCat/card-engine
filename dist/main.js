@@ -184,9 +184,7 @@ class MatchScreen extends GameScreen {
                         action: "play",
                         playerId: playerId,
                         cardIndex: i
-                    }).then({
-                        
-                    })
+                    }).catch(alert)
                 })
             }
         }

@@ -183,17 +183,24 @@ app.post("/action", (req, res) => {
         const action = req.body["action"]
         const playerId = parseInt(req.body["playerId"])
         console.log(`Player: ${playerId}, action: ${action}`)
-        const player = game.players.find(p => p.playerId == playerId)
+        const playerIndex = game.players.findIndex(p => p.playerId == playerId)
+        const player = game.players[playerIndex]
         if (!player) {
             res.status(400)
             res.send({ message: "bad player id" })
         } else if (game.matchState == MatchState.PLAYING) {
             if (action == "play") {
-                const cardIndex = req.body["cardIndex"]
-                const card = game.hands[player.handIndex][cardIndex]
-                game.hands[player.handIndex].splice(cardIndex, 1)
-                game.discard.push(card)
-                res.send({ message: "ok" })
+                if (playerIndex != game.playerTurn) {
+                    res.status(400)
+                    res.send({ message: "not your turn" })
+                } else {
+                    const cardIndex = req.body["cardIndex"]
+                    const card = game.hands[player.handIndex][cardIndex]
+                    game.hands[player.handIndex].splice(cardIndex, 1)
+                    game.discard.push(card)
+                    game.playerTurn = (game.playerTurn + 1) % 4 // next player
+                    res.send({ message: "ok" })
+                }
             } else {
                 res.status(400)
                 res.send({ message: "bad action" })
