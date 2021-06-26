@@ -110,6 +110,9 @@ class MenuScreen extends GameScreen {
 }
 class MatchScreen extends GameScreen {
     renderNodeId = 'matchFloor'
+    get hand() {
+        return game.hands[game.players.find(p => p.playerId === playerId).handIndex] || []
+    }
     onEnter() {
         this.clickRestart = false // TODO: remove this entirely, use game state
         this.interval = setInterval(() => {
@@ -134,25 +137,33 @@ class MatchScreen extends GameScreen {
     }
 
     onRender() {
-        if (game.matchState == MatchState.PLAYING) {
-            //     =======
-            //             `<div id='playerHand'>
-            //         <div id='playerHandActions'><button id="play-button">play</button></div>
-            //      </div>`
-            // //${game.hands[
-            //     playerIndex
-            // ].map((c, i) => this.renderCard(c, i)).join('')}
-            return `<div>
-            ${game.hands[game.players.find(p => p.playerId === playerId).handIndex].reduce((v, c, i) => v + this.renderCard(c, i), "")}
+        if (game.matchState === MatchState.PLAYING) {
+            return `
+                <div id="matchPlayArea">
+                    <div class="matchCardStackCont" id="matchDiscardStack">
+                        <span>Discard</span>
+                        <hr>
+                        <div class="matchCardStack">
+                            ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                        </div>
+                    </div>
+                    <div class="matchCardStackCont" id="matchRemStack">
+                        <span>Deck</span>
+                        <hr>
+                        <div class="matchCardStack">
+                            ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                        </div>
+                    </div>
                 </div>
-                <div><span>Remainder</span>
-                ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                </div>
-                <div><span>Discard</span>
-                ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                <div id='playerHandCont'>
+                    <div class="playerHandAligner"></div>
+                    <div id='playerHand'>
+                        ${this.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
+                    </div>
+                    <div class="playerHandAligner"></div>
                 </div>
                 `
-            } else if (game.matchState == MatchState.WAITING) {
+            } else if (game.matchState === MatchState.WAITING) {
 
 
             return "<p>Waiting for 4 players...</p>"
@@ -176,7 +187,7 @@ class MatchScreen extends GameScreen {
     }
     bindEvents() {
         if (game && game.hands.length) {
-            for (let i = 0; i < game.hands[game.players.find(p => p.playerId === playerId).handIndex].length; i++) {
+            for (let i = 0; i < this.hand.length; i++) {
                 $(`hand-card-${i}`).addEventListener("click", (e) => {
                     document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
                     e.target.classList.add('fuCardSelected')
