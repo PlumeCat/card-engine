@@ -1,11 +1,13 @@
-import Cards from "./cards"
-import { shuffle } from "./deck"
+import Cards from "./cards.js"
+import { shuffle } from "./deck.js"
 
 
-const getNextAlivePlayerIndex = (game, playerId) => {
-    let index = game.players.indexOf(p => p.playerId == playerId)
+const getNextAlivePlayerIndex = (game) => {
+    let index = game.playerTurn
+    console.log(`Next alive player index: ${index}`)
     while (true) {
         index = (index + 1) % 4
+        console.log(` -> ${index}`)
         if (game.players[index].alive) {
             return index
         }
@@ -27,16 +29,17 @@ const isCatCard = card => [
 
 export const TurnStates = {
     START: (params, game, nextAction) => {
-        const playerIndex = game.players.findIndex(p => p.playerId == params.playerId)
         const action = params.action
         if (!action) {
-            throw
+            return
         }
         if (action == "play") {
-            if (game.playerTurn != playerIndex) {
-                throw
-            }
+            const playerIndex = game.players.findIndex(p => p.playerId == params.playerId)
             const hand = game.hands[game.players[playerIndex].handIndex]
+            console.log(`PLAY: ${params.cardIndices}`)
+            if (game.playerTurn != playerIndex) {
+                return
+            }
             if (params.cardIndices.length == 1) {
                 // skip, future, attack, favour, shuffle
                 const card = hand[params.cardIndices[0]]
@@ -44,10 +47,10 @@ export const TurnStates = {
                     // discard the card
                     game.discard.push(...hand.splice(params.cardIndices[0], 1))
                     return "PLAYING_SKIP"
-                } else if (card == Cards.SEEING_FUTURE) {
+                } else if (card == Cards.SEE_FUTURE) {
                     // discard the card
                     game.discard.push(...hand.splice(params.cardIndices[0], 1))
-                    return "PLAYING_SEEING_FUTURE" // and then in 5 seconds, return "SEEING_FUTURE" (unless noped!)
+                    return "PLAYING_SEE_FUTURE"
                 } else if (card == Cards.ATTACK) {
                     // discard the card
                     game.discard.push(...hand.splice(params.cardIndices[0], 1))
@@ -60,16 +63,14 @@ export const TurnStates = {
                     // remoof!
                     game.discard.push(...hand.splice(params.cardIndices[0], 1))
                     return "PLAYING_FAVOUR"
-                } else {
-                    throw
                 }
             } else if (params.cardIndices.length == 2) {
                 const cards = params.cardIndices.map(i => hand[i])
                 if (cards[0] != cards[1]) {
-                    throw
+                    return
                 }
                 if (!isCatCard(cards[0])) {
-                    throw
+                    return
                 }
                 // discard cards
                 params.cardIndices.forEach(i => game.discard.push(hand[i]))
@@ -78,10 +79,10 @@ export const TurnStates = {
             } else if (params.cardIndices.length == 3) {
                 const cards = params.cardIndices.map(i => hand[i])
                 if (cards[0] != cards[1] || cards[0] != cards[2]) {
-                    throw
+                    return
                 }
                 if (!isCatCard(cards[0])) {
-                    throw
+                    return
                 }
                 // discard cards
                 params.cardIndices.forEach(i => game.discard.push(hand[i]))
@@ -90,16 +91,17 @@ export const TurnStates = {
             } else if (params.cardIndices.length == 5) {
                 const cards = params.cardIndices.map(i => hand[i])
                 if ((new Set(cards)).size != 5) {
-                    throw
+                    return
                 }
                 params.cardIndices.forEach(i => game.discard.push(hand[i]))
                 game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
                 return "PLAYING_COMBO5"
-            } else {
-                throw
             }
         } else if (action == "pick") {
+            const playerIndex = game.players.findIndex(p => p.playerId == params.playerId)
+            const hand = game.hands[game.players[playerIndex].handIndex]
             const card = game.remainder.shift()
+            console.log(`PICK: ${card.name}`)
             if (card == Cards.BOMB) {
                 const defusePos = hand.indexOf(Cards.DEFUSE)
                 if (defusePos != -1) {
@@ -115,14 +117,12 @@ export const TurnStates = {
                 hand.push(card)
                 return "END"
             }
-        } else {
-            throw
         }
     },
-    PLAYING_SEEING_FUTURE: (params, game) => {
+    PLAYING_SEE_FUTURE: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "SEEING_FUTURE"
+            return "SEE_FUTURE"
         }
     },
     PLAYING_SKIP: (params, game) => {
@@ -133,10 +133,9 @@ export const TurnStates = {
     },
     PLAYING_ATTACK: (params, game) => {
         const action = params.action
-        const playerId = params.playerId
         if (action == "timer") {
             // attack happened
-            const index = getNextAlivePlayerIndex(game, playerId)
+            const index = getNextAlivePlayerIndex(game)
             game.attackedId = game.players[index].playerId
             return "END"
         }
@@ -179,7 +178,7 @@ export const TurnStates = {
         }
     },
     
-    SEEING_FUTURE: (params, game) => {
+    SEE_FUTURE: (params, game) => {
         const action = params.action
         if (action == "timer") {
             return "START"
@@ -239,30 +238,36 @@ export const TurnStates = {
         }
     },
     
-    DEFUSING: () => {
+    DEFUSING: (params, game) => {
         const action = params.action
-        if (action == "submit-slider") {
+        if (action == "timer") {
             // MUST push a bomb - if player times out, insert randomly
-            game.remainder.splice(params.insertPos, 0, Cards.BOMB)
+            const pos = Math.floor(Math.random() * game.remainder.length)
+            console.log(`Reinserted bomb at ${pos}`)
+            game.remainder.splice(pos, 0, Cards.BOMB)
             return "END"
+        } else if (action == "submit-slider") {
+            game.remainder.splice(params.insertPos, 0, Cards.BOMB)
         }
     },
 
     END: (params, game) => {
+        const action = params.action
         if (action == "immediate") {
-            if (params.playerId == game.attackedId) {
+            if (game.players[game.playerTurn].playerId == game.attackedId) {
                 game.attackedId = null
             } else {
-                game.playerTurn = getNextAlivePlayerIndex(game, params.playerId)
+                console.log("Next player's turn", game.playerTurn)
+                game.playerTurn = getNextAlivePlayerIndex(game)
+                console.log(" -> ", game.playerTurn)
                 // TODO: check for victory here
                 if (game.playerTurn == -1) {
                     // alert("VICTORY")
-                    throw // victory
+                    console.log("Victory!")
+                    return // victory
                 }
             }
             return "START"
-        } else {
-            throw
         }
     }
 }

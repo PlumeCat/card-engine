@@ -2,7 +2,7 @@
 
 import Cards from "./cards.js"
 
-export default [
+const DEFAULT_DECK = [
     ...Array(4).fill(Cards.CAT_RAINBOW),
     ...Array(4).fill(Cards.CAT_BEARD),
     ...Array(4).fill(Cards.CAT_POTATO),

@@ -374,15 +374,15 @@ const compareState = (oldState, newState) => {
     }
 
     // todo watch out for when to enable the below
-    // const keys3 = ['discard', 'remainder']
-    // const keys = [].concat(keys1, keys2, keys3)
-    // Object.keys(newState).forEach(k => {if (!keys.includes(k)) keys3.push(k)})
-    //
-    // for (let key of keys3) {
-    //     if (!_isObjEqual(oldState[key], newState[key])) {
-    //         return false
-    //     }
-    // }
+    const keys3 = ['discard', 'remainder']
+    const keys = [].concat(keys1, keys2, keys3)
+    Object.keys(newState).forEach(k => {if (!keys.includes(k)) keys3.push(k)})
+    
+    for (let key of keys3) {
+        if (!_isObjEqual(oldState[key], newState[key])) {
+            return false
+        }
+    }
 
     return true
 }

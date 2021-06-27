@@ -11,6 +11,11 @@ const app = express()
 app.use(express.json())
 app.use(express.static("./dist/"))
 app.use(express.static("./server/"))
+app.use((req, res, next) => {
+    res.set("Connection", "close")
+    res.set("cache-control", "no-store")
+    next()
+})
 
 const MatchState = {
     WAITING: 0,
@@ -43,9 +48,8 @@ const createGame = (playerName) => {
         hands: [],
         discard: [],
         remainder: [],
-        attack: false, // ongoing attack
-        turnState: TurnStates.START,
-        turnStateName: "START"
+        attackedId: null,
+        turnState: "START"
     }
 
     // deal cards
@@ -61,7 +65,6 @@ let games = {}
 
 
 app.get("/create-game", (req, res) => {
-    res.set("Connection", "close")
     const playerName = req.query["playerName"] || 'player 1'
     
     // get a new unique game id
@@ -85,11 +88,9 @@ app.get("/create-game", (req, res) => {
 
 
 app.get("/join", (req, res) => {
-    res.set("Connection", "close")
     const gameId = req.query["gameId"]
     // const game = games[gameId]
     const game = Object.values(games)[0]
-    console.log(game)
     if (!game) {
         return res.status(400).send({ message: "game not found" })
     }
@@ -113,7 +114,6 @@ app.get("/join", (req, res) => {
 })
 
 app.get("/leave", (req, res) => {
-    res.set("Connection", "close")
     const gameId = req.query["gameId"]
     const playerId = parseInt(req.query["playerId"])
     const game = games[gameId]
@@ -139,13 +139,14 @@ app.get("/leave", (req, res) => {
 
 const onMatchAction = (params, game) => {
     try {
-        const newStateName = game.turnState(params, game)
-        if (newStateName === undefined) {
-            return
+        console.log("Match action: ", params)
+        const newState = TurnStates[game.turnState](params, game)
+        if (newState === undefined) {
+            return false
         }
-        if (newStateName != game.turnStateName) {
-            game.turnStateName = newStateName
-            game.turnState = TurnStates[newStateName]
+        console.log(`State: ${game.turnState} -> ${newState}`)
+        if (newState != game.turnState) {
+            game.turnState = newState
             if (game.activeTimer) {
                 clearTimeout(game.activeTimer)
                 game.activeTimer = null
@@ -163,12 +164,12 @@ const onMatchAction = (params, game) => {
         return true
     } catch (_) {
         // TODO: check for victory (player.alive for 1 player)
+        console.error(_)
         return false
     }
 }
 
 app.post("/action", (req, res) => {
-    res.set("Connection", "close")
     const gameId = req.body["gameId"]
     //const game = games[gameId]
     const game = Object.values(games)[0]
@@ -211,16 +212,19 @@ app.post("/action", (req, res) => {
 })
 
 app.get("/state", (req, res) => {
-    res.set("Connection", "close")
-    res.setHeader("cache-control", "no-store")
-
     const gameId = req.query["gameId"]
     // const game = games[gameId]
     const game = Object.values(games)[0]
     if (!game) {
         return res.status(400).send({ message: "game not found" })
     }
-    return res.status(200).send(game)
+
+    // TODO: awkward hack
+    // remove timer, serialize, put timer back
+    const timer = game.activeTimer
+    delete game.activeTimer
+    res.status(200).send(game)
+    game.activeTimer = timer
 })
 
 app.listen(PORT, () => {
