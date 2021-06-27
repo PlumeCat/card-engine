@@ -6,6 +6,11 @@ body {
     height: 100vh;
     font-family: Tahoma, sans-serif;
 }
+
+button {
+    cursor: pointer;
+}
+
 #matchFloor {
     display: flex;
     flex-direction: column;
@@ -43,7 +48,7 @@ body {
 #playerHandActionsCont {
     display: flex;
     flex-direction: column;
-    padding: 5px;
+    padding: 10px;
 }
 #playerHandActions {
     display: flex;
@@ -51,42 +56,154 @@ body {
     justify-content: center;
     flex-grow: 1;
 }
-#playerInfo {
-    text-align: center;
+.playerInfo {
+    text-align: right;
     color: #b5d9c7;
 }
 
 .fuCard {
-    margin: 0 15px;
-    padding: 20px;
-    background-color: #fff;
-    width: 60px;
-    height: 90px;
-    border: 2px solid transparent;
+    margin: 10px 15px;
+    padding: 15px;
+    background-color: #ffffff;
+    box-shadow: 2px 2px 7px 2px rgba(0, 0, 0, 0.5);
     border-radius: 10px;
     cursor: pointer;
 }
 .fuCard:hover {
-    border: 2px solid orange;
+    box-shadow: 0 0 5px 3px orange;
 }
 .fuCardSelected, .fuCardSelected:hover {
-    border: 2px solid red;
+    box-shadow: 0 0 5px 3px orangered;
+}
+.fuCardInner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 75px;
+    height: 100px;
+    border-radius: 5px;
+}
+
+.fuCardRAI .fuCardInner,
+.fuCardBEA .fuCardInner,
+.fuCardTAC .fuCardInner,
+.fuCardMEL .fuCardInner,
+.fuCardPOT .fuCardInner { background-color: #efefef; box-shadow: 0 0 3px 5px #e0e0e0; }
+.fuCardATT .fuCardInner { background-color: #f8ac93; box-shadow: 0 0 3px 5px #f15a25; }
+.fuCardSKI .fuCardInner { background-color: #8dc1e2; box-shadow: 0 0 3px 5px #1b83c6; }
+.fuCardFAV .fuCardInner { background-color: #959595; box-shadow: 0 0 3px 5px #2c2c2c; }
+.fuCardSHU .fuCardInner { background-color: #b9b1ab; box-shadow: 0 0 3px 5px #736458; }
+.fuCardNOP .fuCardInner { background-color: #cb888c; box-shadow: 0 0 3px 5px #971219; }
+.fuCardFUT .fuCardInner { background-color: #f68ebc; box-shadow: 0 0 3px 5px #ed1e7a; }
+.fuCardDEF .fuCardInner { background-color: #c5e29f; box-shadow: 0 0 3px 5px #8cc640; }
+.fuCardBOM .fuCardInner { background-color: #050505; box-shadow: 0 0 3px 5px #ef7529; }
+.fuCardBOM              { background-color: #050505; color: #ef7529; }
+
+.fdCard {
+    padding: 15px;
+    width: 25px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #efb429;
+    background-color: #a30516;
+    box-shadow: 2px 2px 7px 2px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+}
+
+#matchPlayCont {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+#matchPlayBottom {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+#matchPlayersLeft {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+}
+#matchPlayersTop {
+    display: flex;
+    justify-content: center;
+}
+#matchPlayersRight {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+}
+
+.oppHandCont {
+    display: flex;
+    flex-direction: column;
+    padding: 3px;
+    border-radius: 5px;
+}
+.oppHandCont {
+    cursor: pointer;
+}
+.oppHandCont:hover {
+    box-shadow: 0 0 5px 3px orange;
+}
+
+#matchPlayersLeft .oppHandCont {
+    align-items: flex-start;
+}
+#matchPlayersTop .oppHandCont {
+    align-items: center;
+}
+#matchPlayersRight .oppHandCont {
+    align-items: flex-end;
+}
+
+.oppPlayerInfo {
+    max-width: 70px;
+    color: #b5d9c7;
+    margin: 5px 0 0;
+}
+
+#matchPlayersLeft .oppPlayerInfo {
+    text-align: left;
+}
+#matchPlayersTop .oppPlayerInfo {
+    max-width: 140px;
+    text-align: center;
+}
+#matchPlayersRight .oppPlayerInfo {
+    text-align: right;
 }
 
 #matchPlayArea {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+#matchStacks {
     display: flex;
     justify-content: center;
     align-items: center;
     flex-grow: 1;
     flex-shrink: 1;
 }
-#matchPlayArea > div {
+#matchStacks > div {
     margin: 0 20px;
 }
-#matchPlayArea > div:first-child {
+#matchStacks > div:first-child {
     margin-left: 0;
 }
-#matchPlayArea > div:last-child {
+#matchStacks > div:last-child {
     margin-right: 0;
 }
 
@@ -106,5 +223,11 @@ body {
 }
 #matchRemStack {
     background-color: #a30516;
-    color: #ffffff
+    color: #efb429;
+}
+
+#playInfo {
+    padding: 10px;
+    color: #b5d9c7;
+    font-size: large;
 }
