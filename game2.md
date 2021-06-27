@@ -1,52 +1,19 @@
-# exploding kittens
+# game2.md
 
-hardcoded for 4 players
-
-## list of cards
-    cat-rainbow x4
-    cat-beard x4
-    cat-taco x4
-    cat-melon x4
-    cat-potato x4
-    attack +2 x4
-    shuffle x4
-    nope x5
-    skip x4
-    see-the-future x5
-    favour (get given a card) x4
-    bomb x3
-    defuse x6
-<!-- Nyan cat? -->
-<!-- Grenade cat? Possibly overpowered -->
-    Combos:
-        2x same: pick another players card (hidden)
-        3x same: nominate player + card
-        5x different: pick from discarded
-
-## turn:
-	Optional: Play see-future [nope-chain]
-	Combo x2 [nope-chain], pick
-    Combo x3 [nope-chain], pick
-    Combo x5 [nope-chain], pick
-	Skip [nope-chain [pick] ]
-	Attack [nope-chain [pick] ]
-	Favor [nope-chain] pick
-	Shuffle [nope-chain] pick
-
-
-## states
-Start of turn:
+Start of turn
     Click "play"
-        - "Seeing future"       -> Playing seeing future
         - "2-of-a-kind"         -> Playing combo x2
-        - "3-of-a-kind"         -> Playing combo x2
+        - "3-of-a-kind"         -> Playing combo x3
         - "5 different"         -> Playing combo x5
+        - "Seeing future"       -> Playing seeing future
         - "Skip"                -> Playing skip
         - "Attack"              -> Playing attack
         - "Favour"              -> Playing favour
         - "Shuffle"             -> Playing shuffle
     Click "pick up"
-        - Picking up card
+        - Bomb + defuse         -> Bomb defusing
+        - Bomb                  -> End of turn <!-- player out -->
+        - Other                 -> End of turn <!-- next player -->
 
 
 Playing seeing future:
@@ -55,11 +22,6 @@ Playing seeing future:
     Timer
         -> Seeing future
 
-
-Seeing future
-    <!-- Player can see top 3 cards until the timer finishes -->
-    Timer
-        -> Start-of-turn
 
 Playing combo x2
     <!-- Cards go to discard pile, show to all players -->
@@ -98,7 +60,8 @@ Playing attack
     Player used Nope
         -> Nope [ attack ] Odd
     Timer
-        -> Attacking next player [ 1 ]
+        <!-- Record: Attacking next player -->
+        -> End of turn
 
 
 Playing favour
@@ -116,54 +79,17 @@ Playing shuffle
         -> Shuffling
 
 
-Attacking next player [ 1 ]
-    <!-- Reveal a card to ***next*** player NOT current player -->
-    "bomb" && have defuser (next player)
-        -> Bomb defusing [ attacked 1 ]
-    Is "bomb" && No defuser (next player)
-        <!-- Player lost! -->
-        <!-- Remove next player from game! -->
-        -> End of turn
-    Is not bomb
-        <!-- Add card to ATTACKED PLAYER hand -->
-        -> Attacking next player [ 2 ]
-
-
-Bomb defusing [ attacked 1 ]
-    Submit slider
-        <!-- Reinsert the bomb at chosen position -->
-        -> Attacking next player [ 2 ]
+Seeing future
+    <!-- Player can see top 3 cards until the timer finishes -->
     Timer
-        <!-- reinsert bomb randomly -->
-        -> Attacking enxt player [ 2 ]
-
-
-Attacking next player [ 2 ]
-    "Bomb" && have defuser (next player)
-        -> Bomb defusing [ attacked 2 ]
-    "Bomb" && no defuser (next player)
-        <!-- Player lost! -->
-        <!-- Remove next player from game -->
-        -> End of turn
-    Is not bomb
-        <!-- Add card to ATTACKED player's hand! -->
-        -> End of turn
-
-
-Bomb defusing [ attacked 2 ]
-    Submit slider
-        <!-- Reinsert the bomb at chosen position -->
-        -> End of turn
-    Timer
-        <!-- reinsert bomb randomly -->
-        -> End of turn
+        -> Start of turn
 
 
 Blind stealing a card:
     <!-- Combo X2: Fan out the other player's cards and let the current player click one -->
     Clicked a card
         <!-- Give card to current player -->
-        -> End of play
+        -> Start of turn
 
 
 Naming a card:
@@ -172,44 +98,27 @@ Naming a card:
         <!-- Everyone sees the card that was asked for -->
         <!-- If the target player has one, give to current player -->
         <!-- Everyone sees the exchange IF it happens -->
-        -> End of play
+        -> Start of turn
 
 
 Reclaiming a card:
     <!-- Combo x5: Show the player a UI with all of the discard pile spread out (except bombs), they have to click one -->
     Clicked a card
         <!-- Everyone sees the reclaimed card -->
-        -> End of play
+        -> Start of turn
 
 
 Receiving a card
-    <!-- Combo X2: Targeted player has to click one of their cards; it is given to the other player -->
+    <!-- Favour: Targeted player has to click one of their cards; it is given to the other player -->
     <!-- Nobody else sees the card -->
     Timer
-        -> End of play
+        -> Start of turn
 
 
 Shuffling
     <!-- animate shuffling the deck -->
     Timer
-        -> End of play
-
-
-End of play:
-    Click "pick up"
-        -> Picking up card
-
-
-Picking up card
-    <!-- Reveal next card to player -->
-    Is "bomb" && Have defuser
-        -> Bomb defusing
-    Is "bomb" && No defuser
-        <!-- Current player is out of game! -->
-        -> End of turn
-    Is not "bomb"
-        <!-- Add card to hand -->
-        -> End of turn
+        -> Start of turn
 
 
 Bomb defusing
@@ -226,8 +135,10 @@ Bomb defusing
 
 End of turn
     <!-- Only one player left? Victory condition -->
-    Timer
-        -> Start of turn <!-- next player -->
+    Timer (could be zero seconds idk)
+        <!-- If there is a recorded attack, same player
+            otherwise, next player -->
+        -> Start of turn
 
 
 Nope [see future] Odd
@@ -244,7 +155,7 @@ Nope [ combo x2 ] Odd
     Player used Nope
         -> Nope [ combo x2 ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ combo x2 ] Even
     Player used Nope
         -> Nope [ combo x2 ] Odd
@@ -254,7 +165,7 @@ Nope [ combo x3 ] Odd
     Player used Nope
         -> Nope [ combo x3 ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ combo x3 ] Even
     Player used Nope
         -> Nope [ combo x3 ] Odd
@@ -264,7 +175,7 @@ Nope [ combo x5 ] Odd
     Player used Nope
         -> Nope [ combo x5 ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ combo x5 ] Even
     Player used Nope
         -> Nope [ combo x5 ] Odd
@@ -274,7 +185,7 @@ Nope [ skip ] Odd
     Player used Nope
         -> Nope [ skip ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ skip ] Even
     Player used Nope
         -> Nope [ skip ] Odd
@@ -284,17 +195,18 @@ Nope [ attack ] Odd
     Player used Nope
         -> Nope [ attack ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ attack ] Even
     Player used Nope
         -> Nope [ attack ] Odd
     Timer
-        -> Attacking next player [ 1 ]
+        <!-- Record that there is an attack -->
+        -> End of turn
 Nope [ favour ] Odd
     Player used Nope
         -> Nope [ favour ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ favour ] Even
     Player used Nope
         -> Nope [ favour ] Odd
@@ -304,7 +216,7 @@ Nope [ shuffle ] Odd
     Player used Nope
         -> Nope [ shuffle ] Even
     Timer
-        -> End of play
+        -> Start of turn
 Nope [ shuffle ] Even
     Player used Nope
         -> Nope [ shuffle ] Odd

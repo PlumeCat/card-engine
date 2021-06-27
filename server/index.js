@@ -4,7 +4,8 @@
 
 import express from "express"
 import Cards from "./cards.js"
-import DEFAULT_DECK from "./deck.js"
+import { dealCards } from "./deck.js"
+import { TurnStates } from "./turn.js"
 
 const app = express()
 app.use(express.json())
@@ -31,42 +32,7 @@ const nextId = (() => {
         return _
     }
 })()
-const createPlayer = (playerName, ready = false) => ({ playerId: nextId(), playerName, ready })
-
-const shuffle = (deck) => {
-    const newDeck = deck.slice()
-    for (let i = 0; i < deck.length; i++) {
-        const j = i + Math.floor(Math.random() * (deck.length - i))
-        const buf = newDeck[i]
-        newDeck[i] = newDeck[j]
-        newDeck[j] = buf
-    }
-    return newDeck
-}
-
-const dealCards = () => {
-    // shuffle the default deck and deal cards
-    // returns [ [ hands... ], remainder ]
-    // each hand has at least 1 defuse, and 3 bombs in remainder
-
-    // remove all bombs and all but 2 defuses, and shuffle
-    let deck = DEFAULT_DECK.filter(c => c != Cards.DEFUSE && c != Cards.BOMB)
-    deck.push(Cards.DEFUSE, Cards.DEFUSE) // add 2 defuses back in
-    deck = shuffle(deck)
-    const hands = [ [Cards.DEFUSE], [Cards.DEFUSE], [Cards.DEFUSE], [Cards.DEFUSE] ]
-    
-    // deal each hand 7 cards (they already had a defuse, so 6 each)
-    for (let hand of hands) {
-        while (hand.length < 7) {
-            hand.push(deck.shift())
-        }
-    }
-
-    // shuffle the remainder again
-    const remainder = shuffle([ ...deck, Cards.BOMB, Cards.BOMB, Cards.BOMB ])
-
-    return [ hands, remainder ]
-}
+const createPlayer = (playerName, ready = false) => ({ playerId: nextId(), playerName, ready, alive: true })
 
 const createGame = (playerName) => {
     const game = {
@@ -76,7 +42,10 @@ const createGame = (playerName) => {
         playerTurn: 0,
         hands: [],
         discard: [],
-        remainder: []
+        remainder: [],
+        attack: false, // ongoing attack
+        turnState: TurnStates.START,
+        turnStateName: "START"
     }
 
     // deal cards
@@ -86,6 +55,7 @@ const createGame = (playerName) => {
     
     return game
 }
+
 
 let games = {}
 
@@ -164,6 +134,36 @@ app.get("/leave", (req, res) => {
     return res.status(200).send({ message: "left game" })
 })
 
+const onMatchAction = (params, game) => {
+    try {
+        const newStateName = game.turnState(params, game)
+        if (newStateName === undefined) {
+            return
+        }
+        if (newStateName != game.turnStateName) {
+            game.turnStateName = newStateName
+            game.turnState = TurnStates[newStateName]
+            if (game.activeTimer) {
+                clearTimeout(game.activeTimer)
+                game.activeTimer = null
+            }
+
+            // set the immediate action
+            setImmediate(() => {
+                onMatchAction({ action: "immediate" }, game)
+            })
+            // set the timer action
+            game.activeTimer = setTimeout(() => {
+                onMatchAction({ action: "timer" }, game)
+            }, 3000)
+        }
+        return true
+    } catch (_) {
+        // TODO: check for victory (player.alive for 1 player)
+        return false
+    }
+}
+
 app.post("/action", (req, res) => {
     res.set("Connection", "close")
     const gameId = req.body["gameId"]
@@ -176,44 +176,16 @@ app.post("/action", (req, res) => {
     const action = req.body["action"]
     const playerId = parseInt(req.body["playerId"])
     console.log(`Player: ${playerId}, action: ${action}`)
-    const playerIndex = game.players.findIndex(p => p.playerId == playerId)
-    const player = game.players[playerIndex]
+    const player = game.players.find(p => p.playerId == playerId) //[playerIndex]
     if (!player) {
         return res.status(400).send({ message: "bad player id" })
     }
     
     if (game.matchState == MatchState.PLAYING) {
-        if (action == "play") {
-            if (playerIndex != game.playerTurn) {
-                return res.status(400).send({ message: "not your turn" })
-            }
-            
-            //const cardIndex = req.body["cardIndex"]
-            const cardIndices = req.body["cardIndices"]
-            
-            // add the played cards to discard pile
-            for (let c of cardIndices) {
-                game.discard.push(game.hands[player.handIndex][c])
-            }
-            // remove the played cards from the hand
-            game.hands[player.handIndex] = game.hands[player.handIndex].filter(
-                (c, i) => !cardIndices.includes(i)
-            )
-
-            // const card = game.hands[player.handIndex][cardIndex]
-            // game.hands[player.handIndex].splice(cardIndex, 1)
-            // game.discard.push(card)
-            return res.status(200).send({ message: "ok" })
-        } else if (action == "pick") {
-            if (playerIndex != game.playerTurn){
-                return res.status(400).send({ message: "not your turn" })
-            }
-            if (game.remainder.length) {
-                game.hands[player.handIndex].push(game.remainder.shift())
-            }
-            game.playerTurn = (game.playerTurn + 1) % 4
+        if (onMatchAction(req.body, game)) {
             return res.status(200).send({ message: "ok" })
         }
+        return res.status(400).send({ message: "illegal action" })
     } else if (game.matchState == MatchState.COMPLETE) {
         if (action == "restart") {
             player.ready = true
