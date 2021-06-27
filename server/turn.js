@@ -161,6 +161,7 @@ export const TurnStates = {
             }
         }
     },
+    
     PLAYING_SEE_FUTURE: (params, game) => {
         const action = params.action
         if (action == "timer") {
@@ -180,10 +181,7 @@ export const TurnStates = {
     PLAYING_ATTACK: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            // attack happened
-            const index = getNextAlivePlayerIndex(game)
-            game.attackedId = game.players[index].playerId
-            return "END"
+            return "ATTACKING"
         }
     },
     PLAYING_FAVOUR: (params, game) => {
@@ -207,6 +205,8 @@ export const TurnStates = {
             // save this player as the target player
             game.targetPlayerId = params.targetPlayerId
             return "COMBO2_STEALING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO2_ODD")
         }
     },
     PLAYING_COMBO3: (params, game) => {
@@ -215,12 +215,16 @@ export const TurnStates = {
             // save this player as the target player
             game.targetPlayerId = params.targetPlayerId
             return "COMBO3_NOMINATING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO3_ODD")
         }
     },
     PLAYING_COMBO5: (params, game) => {
         const action = params.action
         if (action == "timer") {
             return "COMBO5_RECLAIMING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO5_ODD")
         }
     },
     
@@ -230,50 +234,6 @@ export const TurnStates = {
             return "START"
         }
     },
-
-    NOPE_FUTURE_ODD: (params, game) => {
-        if (action == "timer") {
-            // nope succeeded
-            return "START"
-        } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FUTURE_EVEN")
-        }
-    },
-    NOPE_FUTURE_EVEN: (params, game) => {
-        const action = params.action
-        if (action == "timer") {
-            // nope was cancelled
-            return "SEE_FUTURE"
-        } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FUTURE_ODD")
-        }
-    },
-
-
-    NOPE_SKIP_ODD: (params, game) => {
-        const action = params.action
-        if (action == "timer") {
-            // nope succeeded
-            return "START"
-        } else if (action == "nope") {
-            // nope was noped
-            return doNope(params, game, "NOPE_SKIP_EVEN")
-        }
-    },
-    NOPE_SKIP_EVEN: (params, game) => {
-        const action = params.action
-        if (action == "timer") {
-            // nope was cancelled
-            return "END"
-        } else if (action == "nope") {
-            // cancelled nope was re-noped
-            return doNope(params, game, "NOPE_SKIP_ODD")
-        }
-    },
-
-
-
-
     COMBO2_STEALING: (params, game) => {
         const action = params.action
         if (action == "clicked-card") {
@@ -327,7 +287,15 @@ export const TurnStates = {
             return "START"
         }
     },
-    
+    ATTACKING: (params, game) => {
+        const action = params.action
+        if (action == "immediate") {
+            // attack happened
+            const index = getNextAlivePlayerIndex(game)
+            game.attackedId = game.players[index].playerId
+            return "END"
+        }
+    },    
     DEFUSING: (params, game) => {
         const action = params.action
         if (action == "timer") {
@@ -340,7 +308,6 @@ export const TurnStates = {
             game.remainder.splice(params.insertPos, 0, Cards.BOMB)
         }
     },
-
     END: (params, game) => {
         const action = params.action
         if (action == "immediate") {
@@ -352,5 +319,134 @@ export const TurnStates = {
             }
             return "START"
         }
-    }
+    },
+
+    NOPE_FUTURE_ODD: (params, game) => {
+        if (action == "timer") {
+            // nope succeeded
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_FUTURE_EVEN")
+        }
+    },
+    NOPE_FUTURE_EVEN: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            // nope was cancelled
+            return "SEE_FUTURE"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_FUTURE_ODD")
+        }
+    },
+    NOPE_SKIP_ODD: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            // nope succeeded
+            return "START"
+        } else if (action == "nope") {
+            // nope was noped
+            return doNope(params, game, "NOPE_SKIP_EVEN")
+        }
+    },
+    NOPE_SKIP_EVEN: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            // nope was cancelled
+            return "END"
+        } else if (action == "nope") {
+            // cancelled nope was re-noped
+            return doNope(params, game, "NOPE_SKIP_ODD")
+        }
+    },
+    NOPE_COMBO2_ODD: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO2_EVEN")
+        }
+    },
+    NOPE_COMBO2_EVEN: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            return "COMBO2_STEALING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO2_ODD")
+        }
+    },
+    NOPE_COMBO3_ODD: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO3_EVEN")
+        }
+    },
+    NOPE_COMBO3_EVEN: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            return "COMBO3_NOMINATING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO3_ODD")
+        }
+    },
+    NOPE_COMBO5_ODD: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO5_EVEN")
+        }
+    },
+    NOPE_COMBO5_EVEN: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
+            return "COMBO5_RECLAIMING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_COMBO5_ODD")
+        }
+    },
+
+    NOPE_SHUFFLE_ODD: (params, game) => {
+        if (action == "timer") {
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_SHUFFLE_EVEN")
+        }
+    },
+    NOPE_SHUFFLE_EVEN: (params, game) => {
+        if (action == "timer") {
+            return "SHUFFLING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_SHUFFLE_EVEN")
+        }
+    },
+    NOPE_ATTACK_ODD: (params, game) => {
+        if (action == "timer") {
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_ATTACK_EVEN")
+        }
+    },
+    NOPE_ATTACK_EVEN: (params, game) => {
+        if (action == "timer") {
+            return "ATTACKING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_ATTACK_ODD")
+        }
+    },
+    NOPE_FAVOUR_ODD: (params, game) => {
+        if (action == "timer") {
+            return "FAVOUR_RECEIVING"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_FAVOUR_EVEN")
+        }
+    },
+    NOPE_FAVOUR_EVEN: (params, game) => {
+        if (action == "timer") {
+            return "START"
+        } else if (action == "nope") {
+            return doNope(params, game, "NOPE_FAVOUR_ODD")
+        }
+    },
 }
