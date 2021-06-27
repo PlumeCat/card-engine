@@ -134,11 +134,13 @@ Bomb defusing
 
 
 End of turn
+    Immediately
+        -> Start of turn (next player (maybe))
     <!-- Only one player left? Victory condition -->
-    Timer (could be zero seconds idk)
+    <!-- Timer (could be zero seconds idk) -->
         <!-- If there is a recorded attack, same player
             otherwise, next player -->
-        -> Start of turn
+        <!-- -> Start of turn -->
 
 
 Nope [see future] Odd

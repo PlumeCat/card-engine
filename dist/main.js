@@ -114,6 +114,9 @@ class MenuScreen extends GameScreen {
 class MatchScreen extends GameScreen {
     renderNodeId = 'matchFloor'
     selectedCards = []  // todo ensure to reset this when necessary
+    get localPlayerAlive() {
+        return game.players.find(p => p.playerId === playerId).alive
+    }
     get hand() {
         return game.hands[game.players.find(p => p.playerId === playerId).handIndex] || []
     }
@@ -173,6 +176,7 @@ class MatchScreen extends GameScreen {
                             </div>
                             <div id="playInfo">
                                 ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName+"'s"} turn...
+                                ${this.localPlayerAlive ? "" : "YOU ARE DEAD!"}
                             </div>
                         </div>
                         <div id="matchPlayersRight">${this.renderOppHand('right')}</div>

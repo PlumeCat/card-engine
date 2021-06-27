@@ -4,18 +4,28 @@ import { shuffle } from "./deck.js"
 
 const getNextAlivePlayerIndex = (game) => {
     let index = game.playerTurn
-    console.log(`Next alive player index: ${index}`)
     while (true) {
         index = (index + 1) % 4
-        console.log(` -> ${index}`)
         if (game.players[index].alive) {
             return index
         }
-        if (game.players[index].playerId == playerId) {
+        if (index == game.playerTurn) {
             // back to self.. next alive player is self
             return -1
         }
     }
+}
+
+const checkWinner = (game) => {
+    console.log("check winner: ", game.players)
+    const aliveCount = game.players.reduce((v, p) => v + (p.alive ? 1 : 0), 0)
+    console.log("alive count: ", aliveCount)
+    if (aliveCount < 2) {
+        console.log("winner")
+        return game.players.find(p => p.alive)
+    }
+    console.log("no winner")
+    return null
 }
 
 const isCatCard = card => [
@@ -111,6 +121,15 @@ export const TurnStates = {
                 } else {
                     game.discard.push(Cards.BOMB)
                     game.players[playerIndex].alive = false
+
+                    // check for a winner here
+                    console.log("checking for winner")
+                    const winner = checkWinner(game)
+                    if (winner !== null) {
+                        console.log(`winner! ${winner.playerName}`)
+                        game.winner = winner.playerName
+                        throw "VICTORY"
+                    }
                     return "END"
                 }
             } else {
@@ -256,16 +275,9 @@ export const TurnStates = {
         if (action == "immediate") {
             if (game.players[game.playerTurn].playerId == game.attackedId) {
                 game.attackedId = null
+                // if attack was played, end of the attacker's turn can't be victory condition
             } else {
-                console.log("Next player's turn", game.playerTurn)
                 game.playerTurn = getNextAlivePlayerIndex(game)
-                console.log(" -> ", game.playerTurn)
-                // TODO: check for victory here
-                if (game.playerTurn == -1) {
-                    // alert("VICTORY")
-                    console.log("Victory!")
-                    return // victory
-                }
             }
             return "START"
         }

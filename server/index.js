@@ -162,9 +162,12 @@ const onMatchAction = (params, game) => {
             }, 3000)
         }
         return true
-    } catch (_) {
-        // TODO: check for victory (player.alive for 1 player)
-        console.error(_)
+    } catch (ex) {
+        if (ex == "VICTORY") {
+            clearTimeout(game.activeTimer)
+            game.matchState = MatchState.COMPLETE
+            return true
+        }
         return false
     }
 }
