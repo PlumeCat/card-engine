@@ -172,7 +172,7 @@ class MatchScreen extends GameScreen {
                                 </div>
                             </div>
                             <div id="playInfo">
-                                ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName}${this.isYourTurn() ? '' : "'s"} turn...
+                                ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName+"'s"} turn...
                             </div>
                         </div>
                         <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
