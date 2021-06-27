@@ -92,7 +92,7 @@ let games = {}
 
 app.get("/create-game", (req, res) => {
     res.set("Connection", "close")
-    const playerName = req.query["playerName"]
+    const playerName = req.query["playerName"] || 'player 1'
     
     // get a new unique game id
     let gameId = ""
@@ -107,6 +107,7 @@ app.get("/create-game", (req, res) => {
     // the calling player joins immediately
     return res.status(200).send({
         gameId: gameId,
+        playerName: playerName,
         playerId: game.players[0].playerId
     })
 })
@@ -127,7 +128,7 @@ app.get("/join", (req, res) => {
         return res.status(400).send({ message: "too many players" })
     }
     
-    const playerName = req.query["playerName"]
+    const playerName = req.query["playerName"] || `player ${game.players.length + 1}`
     console.log(`Player joined: ${playerName}`)
     game.players.push(createPlayer(playerName))
     if (game.players.length == 4) {
@@ -135,6 +136,8 @@ app.get("/join", (req, res) => {
         game.players.forEach((p, i) => {  p.handIndex = i })
     }
     return res.status(200).send({
+        gameId: Object.keys(games)[0],
+        playerName: playerName,
         playerId: game.players[game.players.length - 1].playerId
     }) // TODO: return immediate game state?
 })

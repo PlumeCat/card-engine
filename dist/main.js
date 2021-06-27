@@ -79,6 +79,8 @@ class MenuScreen extends GameScreen {
             gameId = $("game-id-input").value
             apiGet("/join", { playerName, gameId }).then(res => {
                 playerId = res.playerId
+                playerName = res.playerName
+                gameId = res.gameId
                 setScreen(new MatchScreen())
             }).catch(alert)
         })
@@ -88,6 +90,7 @@ class MenuScreen extends GameScreen {
             playerName = $("name-input").value
             apiGet("/create-game", { playerName }).then(res => {
                 playerId = res.playerId
+                playerName = res.playerName
                 gameId = res.gameId
                 setScreen(new MatchScreen())
             }).catch(alert) // TODO: not very helpful
@@ -114,14 +117,18 @@ class MatchScreen extends GameScreen {
     get hand() {
         return game.hands[game.players.find(p => p.playerId === playerId).handIndex] || []
     }
+    get currentPlayer() {
+        return game.players[game.playerTurn]
+    }
+    isYourTurn() {
+        return this.currentPlayer.playerId === playerId
+    }
     onEnter() {
         this.clickRestart = false // TODO: remove this entirely, use game state
         this.interval = setInterval(() => {
             // query state
             apiGet("/state", { gameId }).then(newState => {
-                if (game.matchState !== newState.matchState ||
-                    !objEqual(game.hands, newState.hands) ||
-                    !objEqual(game.players, newState.players)) {
+                if (!compareState(game, newState)) {
                     game = newState
                     if (game.matchState != MatchState.COMPLETE) {
                         this.clickRestart = false
@@ -145,22 +152,27 @@ class MatchScreen extends GameScreen {
                     <div id="matchPlayBottom">
                         <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
                         <div id="matchPlayArea">
-                            <div class="matchCardStackCont" id="matchDiscardStack">
-                                <span>Discard</span>
-                                <hr>
-                                <div class="matchCardStack">
-                                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                            <div id="matchStacks">
+                                <div class="matchCardStackCont" id="matchDiscardStack">
+                                    <span>Discard</span>
+                                    <hr>
+                                    <div class="matchCardStack">
+                                        ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                                    </div>
+                                </div>
+                                <div class="matchCardStackCont" id="matchRemStack">
+                                    <span>Deck</span>
+                                    <hr>
+                                    <div class="matchCardStack">
+                                        ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                                    </div>
+                                </div>
+                                <div id="matchPlayAreaActions">
+                                    <button id="pick-button">pick</button>
                                 </div>
                             </div>
-                            <div class="matchCardStackCont" id="matchRemStack">
-                                <span>Deck</span>
-                                <hr>
-                                <div class="matchCardStack">
-                                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                </div>
-                            </div>
-                            <div id="matchPlayAreaActions">
-                                <button id="pick-button">pick</button>
+                            <div id="playInfo">
+                                ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName}${this.isYourTurn() ? '' : "'s"} turn...
                             </div>
                         </div>
                         <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
@@ -203,7 +215,10 @@ class MatchScreen extends GameScreen {
         const player = game.players[(game.players.findIndex(p => p.playerId === playerId) + n) % 4]
         const len = game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
         return `
-            <div><div class="fdCard fdCardOpp">x${len}</div><div class="playerInfo">${player.playerName}</div></div>
+            <div class="oppHandCont" id="oppHand-${player.playerId}">
+                <div class="fdCard fdCardOpp">${len}</div>
+                <div class="oppPlayerInfo">${player.playerName}</div>
+            </div>
         `
     }
     renderMatch() {
@@ -261,6 +276,23 @@ class MatchScreen extends GameScreen {
             apiGet("/leave", { gameId, playerId })
             setScreen(new MenuScreen())
         })
+
+        if (game && game.matchState === MatchState.PLAYING) {
+            game.players.forEach(p => {
+                if (p.playerId === playerId) {
+                    return
+                }
+                $(`oppHand-${p.playerId}`).addEventListener('click', () => {
+                    console.log('CLICKED PLAYER', p.playerName, p.playerId)
+                    apiPost("/action", {
+                        action: "clicked-player",
+                        gameId: gameId,
+                        playerId: playerId,
+                        targetPlayerId: p.playerId
+                    }).catch(alert)
+                })
+            })
+        }
     }
 }
 
@@ -318,3 +350,39 @@ const _isObjEqual = (a, b) => {
 
 
 const _isObject = obj => obj === Object(obj)
+
+
+const compareState = (oldState, newState) => {
+    const keys1 = ['matchState', 'playerTurn']
+
+    for (let key of keys1) {
+        if (oldState[key] !== newState[key]) {
+            return false
+        }
+    }
+
+    const keys2 = ['hands', 'players']
+
+    for (let key of keys2) {
+        if (!objEqual(oldState[key], newState[key])) {
+            return false
+        }
+    }
+
+    if (!objEqual(Object.keys(oldState), Object.keys(newState))) {
+        return false
+    }
+
+    // todo watch out for when to enable the below
+    // const keys3 = ['discard', 'remainder']
+    // const keys = [].concat(keys1, keys2, keys3)
+    // Object.keys(newState).forEach(k => {if (!keys.includes(k)) keys3.push(k)})
+    //
+    // for (let key of keys3) {
+    //     if (!_isObjEqual(oldState[key], newState[key])) {
+    //         return false
+    //     }
+    // }
+
+    return true
+}

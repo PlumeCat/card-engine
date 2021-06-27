@@ -48,7 +48,7 @@ button {
 #playerHandActionsCont {
     display: flex;
     flex-direction: column;
-    padding: 5px;
+    padding: 10px;
 }
 #playerHandActions {
     display: flex;
@@ -57,7 +57,7 @@ button {
     flex-grow: 1;
 }
 .playerInfo {
-    text-align: center;
+    text-align: right;
     color: #b5d9c7;
 }
 
@@ -101,13 +101,13 @@ button {
 .fuCardBOM              { background-color: #050505; color: #ef7529; }
 
 .fdCard {
-    margin: 10px;
     padding: 15px;
     width: 25px;
     height: 40px;
     display: flex;
     justify-content: center;
     align-items: center;
+    color: #efb429;
     background-color: #a30516;
     box-shadow: 2px 2px 7px 2px rgba(0, 0, 0, 0.5);
     border-radius: 10px;
@@ -129,6 +129,7 @@ button {
 #matchPlayersLeft {
     display: flex;
     align-items: center;
+    padding: 5px;
 }
 #matchPlayersTop {
     display: flex;
@@ -137,22 +138,72 @@ button {
 #matchPlayersRight {
     display: flex;
     align-items: center;
+    padding: 5px;
+}
+
+.oppHandCont {
+    display: flex;
+    flex-direction: column;
+    padding: 3px;
+    border-radius: 5px;
+}
+.oppHandCont {
+    cursor: pointer;
+}
+.oppHandCont:hover {
+    box-shadow: 0 0 5px 3px orange;
+}
+
+#matchPlayersLeft .oppHandCont {
+    align-items: flex-start;
+}
+#matchPlayersTop .oppHandCont {
+    align-items: center;
+}
+#matchPlayersRight .oppHandCont {
+    align-items: flex-end;
+}
+
+.oppPlayerInfo {
+    max-width: 70px;
+    color: #b5d9c7;
+    margin: 5px 0 0;
+}
+
+#matchPlayersLeft .oppPlayerInfo {
+    text-align: left;
+}
+#matchPlayersTop .oppPlayerInfo {
+    max-width: 140px;
+    text-align: center;
+}
+#matchPlayersRight .oppPlayerInfo {
+    text-align: right;
 }
 
 #matchPlayArea {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+#matchStacks {
     display: flex;
     justify-content: center;
     align-items: center;
     flex-grow: 1;
     flex-shrink: 1;
 }
-#matchPlayArea > div {
+#matchStacks > div {
     margin: 0 20px;
 }
-#matchPlayArea > div:first-child {
+#matchStacks > div:first-child {
     margin-left: 0;
 }
-#matchPlayArea > div:last-child {
+#matchStacks > div:last-child {
     margin-right: 0;
 }
 
@@ -172,5 +223,11 @@ button {
 }
 #matchRemStack {
     background-color: #a30516;
-    color: #ffffff
+    color: #efb429;
+}
+
+#playInfo {
+    padding: 10px;
+    color: #b5d9c7;
+    font-size: large;
 }
