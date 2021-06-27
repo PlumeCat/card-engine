@@ -1,3 +1,7 @@
+/**, ::after, ::before {*/
+/*    box-sizing: border-box;*/
+/*}*/
+
 body {
     margin: 0;
     display: flex;
@@ -11,6 +15,89 @@ button {
     cursor: pointer;
     padding: 10px;
 }
+
+/* ========= MODAL ========= */
+.fade {
+    opacity: 0;
+    transition: opacity .15s linear;
+}
+.fade.show {
+    opacity: 1;
+}
+
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1071;
+    background-color: #000;
+}
+.modal-backdrop.fade {
+    opacity: 0;
+}
+.modal-backdrop.show {
+    opacity: .7;
+}
+
+
+.modal {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1072;
+    display: none;
+    overflow: hidden;
+    outline: 0;
+}
+.modal-open .modal {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.modal.show {
+    display: block;
+}
+
+.modal-dialog {
+    position: relative;
+    width: auto;
+    pointer-events: none;
+}
+.modal-dialog-centered {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+.modal.fade .modal-dialog {
+    transition: transform .3s ease-out;
+    transform: translate(0,-25%);
+}
+.modal.show .modal-dialog {
+    transform: translate(0,0);
+}
+
+
+.modal-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    /*background-color: #fff;*/
+    background-clip: padding-box;
+    /*border: 1px solid rgba(0,0,0,.2);*/
+    border-radius: .3rem;
+    outline: 0;
+}
+
+/* ========= END MODAL ========= */
+
 
 #matchFloor {
     display: flex;
@@ -148,10 +235,10 @@ button {
     padding: 3px;
     border-radius: 5px;
 }
-.oppHandCont {
+.oppHandCont.enabled, #combo2OppHand .fdCard {
     cursor: pointer;
 }
-.oppHandCont:hover {
+.oppHandCont.enabled:hover, #combo2OppHand .fdCard:hover {
     box-shadow: 0 0 5px 3px orange;
 }
 
@@ -231,4 +318,11 @@ button {
     padding: 10px;
     color: #b5d9c7;
     font-size: large;
+}
+
+#combo2OppHand {
+    display: flex;
+}
+#combo2OppHand .fdCard {
+    margin: 10px;
 }
