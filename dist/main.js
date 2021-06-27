@@ -193,6 +193,7 @@ class MatchScreen extends GameScreen {
                     <div id="playerHandActionsCont">
                         <div id="playerHandActions">
                             <button id="play-button">play</button>
+                            <button id="nope-button">nope</button>
                         </div>
                         <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                     </div>
@@ -279,6 +280,11 @@ class MatchScreen extends GameScreen {
             console.log("EXIT")
             apiGet("/leave", { gameId, playerId })
             setScreen(new MenuScreen())
+        })
+
+        $("nope-button")?.addEventListener("click", () => {
+            console.log("NOEP")
+            apiPost("/action", { playerId, action: "nope" }).catch(alert)
         })
 
         if (game && game.matchState === MatchState.PLAYING) {

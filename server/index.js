@@ -139,7 +139,7 @@ app.get("/leave", (req, res) => {
 
 const onMatchAction = (params, game) => {
     try {
-        console.log("Match action: ", params)
+        console.log("Match action: ", params, " | ", game.turnState)
         const newState = TurnStates[game.turnState](params, game)
         if (newState === undefined) {
             return false
