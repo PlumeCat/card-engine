@@ -11,6 +11,18 @@ const MatchState = {
     COMPLETE: 2
 }
 
+const ChooseOppTurnStates = [  // todo verify these
+    'PLAYING_COMBO2',
+    'PLAYING_COMBO3',
+    'PLAYING_FAVOUR',
+]
+
+const ModalTurnStates = [
+    'COMBO2_STEALING',
+    'COMBO3_NOMINATING',
+    'COMBO5_RECLAIMING',
+]
+
 // helper functions
 const API_PATH = "//localhost:3000"
 const $ = id => document.getElementById(id)
@@ -117,6 +129,9 @@ class MatchScreen extends GameScreen {
     get localPlayerAlive() {
         return game.players.find(p => p.playerId === playerId).alive
     }
+    showModal() {
+        return this.isYourTurn() && ModalTurnStates.includes(game.turnState)
+    }
     get hand() {
         return game.hands[game.players.find(p => p.playerId === playerId).handIndex] || []
     }
@@ -125,6 +140,9 @@ class MatchScreen extends GameScreen {
     }
     isYourTurn() {
         return this.currentPlayer.playerId === playerId
+    }
+    chooseOppEnabled() {
+        return this.isYourTurn() && ChooseOppTurnStates.includes(game.turnState)
     }
     onEnter() {
         this.clickRestart = false // TODO: remove this entirely, use game state
@@ -197,6 +215,7 @@ class MatchScreen extends GameScreen {
                         <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                     </div>
                 </div>
+                ${this.showModal() ? modal() : ''}
                 `
         } else if (game.matchState === MatchState.WAITING) {
             return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p>`
@@ -219,7 +238,7 @@ class MatchScreen extends GameScreen {
         const player = game.players[(game.players.findIndex(p => p.playerId === playerId) + n) % 4]
         const len = game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
         return `
-            <div class="oppHandCont" id="oppHand-${player.playerId}">
+            <div class="oppHandCont${this.chooseOppEnabled() ? ' enabled' : ''}" id="oppHand-${player.playerId}">
                 <div class="fdCard fdCardOpp">${len}</div>
                 <div class="oppPlayerInfo">${player.playerName}</div>
             </div>
@@ -281,7 +300,7 @@ class MatchScreen extends GameScreen {
             setScreen(new MenuScreen())
         })
 
-        if (game && game.matchState === MatchState.PLAYING) {
+        if (game && game.matchState === MatchState.PLAYING && this.chooseOppEnabled()) {
             game.players.forEach(p => {
                 if (p.playerId === playerId) {
                     return
@@ -297,6 +316,19 @@ class MatchScreen extends GameScreen {
                 })
             })
         }
+
+        document.querySelectorAll('#combo2OppHand .fdCard').forEach(c => {
+            const index = parseInt(c.id.split('-').pop())
+            c.addEventListener('click', () => {
+                console.log(`${index} card clicked`)
+                apiPost("/action", {
+                    action: "clicked-card",
+                    gameId: gameId,
+                    playerId: playerId,
+                    targetCardIndex: index
+                }).catch(alert)
+            })
+        })
     }
 }
 
@@ -357,7 +389,7 @@ const _isObject = obj => obj === Object(obj)
 
 
 const compareState = (oldState, newState) => {
-    const keys1 = ['matchState', 'playerTurn']
+    const keys1 = ['matchState', 'turnState', 'playerTurn', 'attackedId', 'targetPlayerId']
 
     for (let key of keys1) {
         if (oldState[key] !== newState[key]) {
@@ -389,4 +421,35 @@ const compareState = (oldState, newState) => {
     }
 
     return true
+}
+
+
+const modal = () => {
+    return `
+<div class="modal fade show" id="exampleModalCenter" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+        ${modalContent()}
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show"></div>
+`
+}
+
+const modalContent = () => {
+    if (game.turnState === 'COMBO2_STEALING') {
+        return combo2StealingModal()
+    }
+    return ''
+}
+
+const combo2StealingModal = () => {
+    const len = game.hands[game.players.find(p => p.playerId === game.targetPlayerId).handIndex].length  // todo this comes from server eventually
+    return `
+    <div id="combo2OppHand">
+    ${Array.from({length: len}, (_, i) => `<div class="fdCard" id="combo2pick-${i}"></div>`).join('')}
+    </div>
+    `
 }
