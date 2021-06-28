@@ -165,7 +165,7 @@ export const TurnStates = {
         if (action == "clicked-player") {
             // save this player as the target player
             game.targetPlayerId = params.targetPlayerId
-            return "FAVOUR_RECEVING"
+            return "FAVOUR_RECEIVING"
         }
     },
     PLAYING_SHUFFLE: (params, game) => {

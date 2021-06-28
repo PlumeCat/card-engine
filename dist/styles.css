@@ -16,6 +16,10 @@ button {
     padding: 10px;
 }
 
+button[disabled] {
+    cursor: default;
+}
+
 /* ========= MODAL ========= */
 .fade {
     opacity: 0;
@@ -318,6 +322,7 @@ button {
     padding: 10px;
     color: #b5d9c7;
     font-size: large;
+    text-align: center;
 }
 
 #combo2OppHand {

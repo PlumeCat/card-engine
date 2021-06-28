@@ -11,7 +11,7 @@ const MatchState = {
     COMPLETE: 2
 }
 
-const ChooseOppTurnStates = [  // todo verify these
+const ChooseOppTurnStates = [
     'PLAYING_COMBO2',
     'PLAYING_COMBO3',
     'PLAYING_FAVOUR',
@@ -21,7 +21,32 @@ const ModalTurnStates = [
     'COMBO2_STEALING',
     'COMBO3_NOMINATING',
     'COMBO5_RECLAIMING',
+    'DEFUSING',
 ]
+
+const getTurnStateMsg = () => {
+    const currentPlayer = `<b>${game.players[game.playerTurn].playerName}</b>`
+    const targetPlayer = `<b>${game.players.find(p => p.playerId === game.targetPlayerId)?.playerName}</b>`
+
+    const isPlayer = playerId === game.players[game.playerTurn].playerId
+    const isTarget = playerId === game.targetPlayerId
+
+    if (ChooseOppTurnStates.includes(game.turnState)) {
+        return isPlayer ? 'choose a player' : ''
+    }
+    if (game.turnState === 'FAVOUR_RECEIVING') {
+        return isPlayer ? `waiting for card from ${targetPlayer}`
+             : isTarget ? `choose 1 card to give to ${currentPlayer}`
+             : `${targetPlayer} has to give 1 card ${currentPlayer}`
+    }
+    if (game.turnState === 'COMBO2_STEALING') {
+        return isPlayer ? `pick a card from ${targetPlayer}'s hand`
+             : isTarget ? `your cards are fanned out for ${currentPlayer} to grab one!`
+             : `${currentPlayer} is picking a card from ${targetPlayer}'s hand`
+    }
+    return ''
+}
+
 
 // helper functions
 const API_PATH = "//localhost:3000"
@@ -125,7 +150,7 @@ class MenuScreen extends GameScreen {
 }
 class MatchScreen extends GameScreen {
     renderNodeId = 'matchFloor'
-    selectedCards = []  // todo ensure to reset this when necessary
+    selectedCardsIndices = []  // todo ensure to reset this when necessary
     get localPlayerAlive() {
         return game.players.find(p => p.playerId === playerId).alive
     }
@@ -140,6 +165,9 @@ class MatchScreen extends GameScreen {
     }
     isYourTurn() {
         return this.currentPlayer.playerId === playerId
+    }
+    isGivingFavour() {
+        return game.turnState === 'FAVOUR_RECEIVING' && game.targetPlayerId === playerId
     }
     chooseOppEnabled() {
         return this.isYourTurn() && ChooseOppTurnStates.includes(game.turnState)
@@ -164,7 +192,6 @@ class MatchScreen extends GameScreen {
     onExit() {
         clearInterval(this.interval)
     }
-
     onRender() {
         if (game.matchState === MatchState.PLAYING) {
             return `
@@ -192,10 +219,7 @@ class MatchScreen extends GameScreen {
                                     <button id="pick-button">pick</button>
                                 </div>
                             </div>
-                            <div id="playInfo">
-                                ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName+"'s"} turn...
-                                ${this.localPlayerAlive ? "" : "YOU ARE DEAD!"}
-                            </div>
+                            ${this.renderPlayInfo()}
                         </div>
                         <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
                     </div>
@@ -211,6 +235,7 @@ class MatchScreen extends GameScreen {
                     <div id="playerHandActionsCont">
                         <div id="playerHandActions">
                             <button id="play-button">play</button>
+                            ${this.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
                         </div>
                         <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                     </div>
@@ -227,7 +252,7 @@ class MatchScreen extends GameScreen {
     }
     renderCard(c, i) {
         return `
-        <div id="hand-card-${i}" class="fuCard fuCard${c.name.split('_').pop().substr(0, 3)}">
+        <div id="hand-card-${i}" class="fuCard fuCard${c.name.split('_').pop().substr(0, 3)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
             <div class="fuCardInner">
                 ${c.displayName || c.name.replace('_', ' ')}
             </div>
@@ -244,6 +269,19 @@ class MatchScreen extends GameScreen {
             </div>
         `
     }
+    renderPlayInfo() {
+        return `
+            <div id="playInfo">
+                <div>
+                    ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName+"'s"} turn...
+                    ${this.localPlayerAlive ? "" : "YOU ARE DEAD!"}
+                </div>
+                <div>
+                    ${getTurnStateMsg()}                
+                </div>
+            </div>
+        `
+    }
     renderMatch() {
         return `
         <div id="matchStage">
@@ -251,21 +289,49 @@ class MatchScreen extends GameScreen {
         </div>
         `
     }
+    validateCardsForPlay() {
+        return true  // todo enable front end validation when ready
+        if (this.isYourTurn()) {
+            // todo finish the rules here
+            // todo can nope be played when it's your turn?
+            return this.selectedCardsIndices.length
+        }
+        else {
+            // todo also check the turnState is nope-able
+            return this.selectedCardsIndices.length === 1 && this.hand[this.selectedCardsIndices[0]].name === 'NOPE'
+        }
+    }
+    buttonIsDisabled(id) {
+        return false  // todo enable front end validation when ready
+        if (id === 'give-button') {
+            return this.selectedCardsIndices.length !== 1
+        }
+        if (id === 'play-button') {
+            return !this.validateCardsForPlay()
+        }
+    }
     bindEvents() {
         if (game && game.hands.length) {
             for (let i = 0; i < this.hand.length; i++) {
                 $(`hand-card-${i}`).addEventListener("click", (e) => {
-                    if (this.selectedCards.includes(i)) {
-                        this.selectedCards = this.selectedCards.filter(c => c!== i)
+                    if (this.selectedCardsIndices.includes(i)) {
+                        this.selectedCardsIndices = this.selectedCardsIndices.filter(c => c!== i)
                         $(`hand-card-${i}`).classList.remove('fuCardSelected')
                     }
                     else {
-                        this.selectedCards.push(i)
+                        if (this.isGivingFavour()) {
+                            this.selectedCardsIndices = []
+                            document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+                        }
+                        this.selectedCardsIndices.push(i)
                         $(`hand-card-${i}`).classList.add('fuCardSelected')
                     }
+                    document.querySelectorAll('#playerHandActions button').forEach(b => {b.disabled = this.buttonIsDisabled(b.id)})
                 })
             }
         }
+
+        document.querySelectorAll('button').forEach(b => b.disabled = this.buttonIsDisabled(b.id))
 
         $("pick-button")?.addEventListener("click", e => {
             apiPost("/action", {
@@ -281,9 +347,9 @@ class MatchScreen extends GameScreen {
                 action: "play",
                 gameId: gameId,
                 playerId: playerId,
-                cardIndices: this.selectedCards
+                cardIndices: this.selectedCardsIndices
             }).then(() => {
-                this.selectedCards = []
+                this.selectedCardsIndices = []
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
             }).catch(alert)
         })
@@ -328,6 +394,19 @@ class MatchScreen extends GameScreen {
                     targetCardIndex: index
                 }).catch(alert)
             })
+        })
+
+        $("give-button")?.addEventListener("click", () => {
+            console.log("PLAY")
+            apiPost("/action", {
+                action: "clicked-card",
+                gameId: gameId,
+                playerId: playerId,
+                targetCardIndex: this.selectedCardsIndices[0]
+            }).then(() => {
+                this.selectedCardsIndices = []
+                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+            }).catch(alert)
         })
     }
 }
