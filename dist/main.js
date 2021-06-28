@@ -11,38 +11,55 @@ const MatchState = {
     COMPLETE: 2
 }
 
+// ========= TURN STATES =========
+const TS_PLAYING_COMBO2    = 'PLAYING_COMBO2',
+      TS_PLAYING_COMBO3    = 'PLAYING_COMBO3',
+      TS_PLAYING_FAVOUR    = 'PLAYING_FAVOUR',
+      TS_COMBO2_STEALING   = 'COMBO2_STEALING',
+      TS_COMBO3_NOMINATING = 'COMBO3_NOMINATING',
+      TS_COMBO5_RECLAIMING = 'COMBO5_RECLAIMING',
+      TS_FAVOUR_RECEIVING  = 'FAVOUR_RECEIVING',
+      TS_DEFUSING          = 'DEFUSING'
+// ===============================
+
 const ChooseOppTurnStates = [
-    'PLAYING_COMBO2',
-    'PLAYING_COMBO3',
-    'PLAYING_FAVOUR',
+    TS_PLAYING_COMBO2,
+    TS_PLAYING_COMBO3,
+    TS_PLAYING_FAVOUR,
 ]
 
 const ModalTurnStates = [
-    'COMBO2_STEALING',
-    'COMBO3_NOMINATING',
-    'COMBO5_RECLAIMING',
-    'DEFUSING',
+    TS_COMBO2_STEALING,
+    TS_COMBO3_NOMINATING,
+    TS_COMBO5_RECLAIMING,
+    TS_DEFUSING,
 ]
 
-const getTurnStateMsg = () => {
-    const currentPlayer = `<b>${game.players[game.playerTurn].playerName}</b>`
-    const targetPlayer = `<b>${game.players.find(p => p.playerId === game.targetPlayerId)?.playerName}</b>`
+const getTurnStateMsg = (state) => {
+    const currentPlayer = `<b>${state.currentPlayer.playerName}</b>`
+    const targetPlayer = `<b>${state.targetPlayer?.playerName}</b>`
 
-    const isPlayer = playerId === game.players[game.playerTurn].playerId
-    const isTarget = playerId === game.targetPlayerId
+    const isPlayer = state.playerId === state.currentPlayer.playerId
+    const isTarget = state.playerId === state.game.targetPlayerId
 
-    if (ChooseOppTurnStates.includes(game.turnState)) {
+    const turnState = state.turnState
+
+    if (ChooseOppTurnStates.includes(turnState)) {
         return isPlayer ? 'choose a player' : ''
     }
-    if (game.turnState === 'FAVOUR_RECEIVING') {
+    if (turnState === TS_FAVOUR_RECEIVING) {
         return isPlayer ? `waiting for card from ${targetPlayer}`
              : isTarget ? `choose 1 card to give to ${currentPlayer}`
              : `${targetPlayer} has to give 1 card ${currentPlayer}`
     }
-    if (game.turnState === 'COMBO2_STEALING') {
+    if (turnState === TS_COMBO2_STEALING) {
         return isPlayer ? `pick a card from ${targetPlayer}'s hand`
              : isTarget ? `your cards are fanned out for ${currentPlayer} to grab one!`
              : `${currentPlayer} is picking a card from ${targetPlayer}'s hand`
+    }
+    if (turnState === TS_DEFUSING) {
+        return isPlayer ? ''
+             : `${currentPlayer} picked a bomb! defusing...`
     }
     return ''
 }
@@ -71,6 +88,8 @@ const api = (method, path, params, headers, body) => fetch(API_PATH + path + mak
 const apiPost = (path, body) => api("POST", path, null, null, body)
 const apiGet = (path, params) => api("GET", path, params, null, null)
 
+
+
 // TODO: no global variables (or redux)
 let currentScreen = null
 const setScreen = (screen) => {
@@ -87,14 +106,66 @@ const render = () => {
 }
 
 
-let playerId = null
-let gameId = ""
-let playerName = ""
-let game = {
-    matchState: MatchState.WAITING,
-    players: [],
-    hands: [],
-    winner: ""
+
+class PlayState {
+    constructor(params) {
+        const { playerId, playerName, gameId } = params
+        this.playerId = playerId
+        this.playerName = playerName
+        this.gameId = gameId
+        this.game = {
+            matchState: MatchState.WAITING,
+            players: [],
+            hands: [],
+            winner: ""
+        }
+    }
+    get player() {
+        return this.game.players.find(p => p.playerId === this.playerId)
+    }
+    get currentPlayer() {
+        return this.game.players[this.game.playerTurn]
+    }
+    get targetPlayer() {
+        return this.game.players.find(p => p.playerId === this.game.targetPlayerId)
+    }
+    get hand() {
+        return this.game.hands[this.player.handIndex] || []
+    }
+    get turnState() {
+        return this.game.turnState
+    }
+    getState() {
+        // query state
+        apiGet("/state", { gameId: this.gameId })
+            .then(newState => {
+                if (newState && !compareState(this.game, newState)) {
+                    this.game = newState
+                    render()
+                }
+            }).catch(console.error)
+    }
+    isYourTurn() {
+        return this.currentPlayer.playerId === this.playerId
+    }
+    getNthPlayer(n) {
+        return this.game.players[(this.game.players.findIndex(p => p.playerId === this.playerId) + n) % 4]
+    }
+    showModal() {
+        return this.isYourTurn() && ModalTurnStates.includes(this.turnState)
+    }
+    isGivingFavour() {
+        return this.turnState === TS_FAVOUR_RECEIVING && this.game.targetPlayerId === this.playerId
+    }
+    chooseOppEnabled() {
+        return this.isYourTurn() && ChooseOppTurnStates.includes(this.turnState)
+    }
+    apiParams() {
+        return {
+            gameId: this.gameId,
+            playerId: this.playerId,
+        }
+    }
 }
 
 
@@ -112,24 +183,18 @@ class MenuScreen extends GameScreen {
     bindEvents() {
         $("join-button")?.addEventListener("click", e => {
             e.preventDefault()
-            playerName = $("name-input").value
-            gameId = $("game-id-input").value
+            const playerName = $("name-input").value
+            const gameId = $("game-id-input").value
             apiGet("/join", { playerName, gameId }).then(res => {
-                playerId = res.playerId
-                playerName = res.playerName
-                gameId = res.gameId
-                setScreen(new MatchScreen())
+                setScreen(new MatchScreen(res))
             }).catch(alert)
         })
 
         $("create-button")?.addEventListener("click", e => {
             e.preventDefault()
-            playerName = $("name-input").value
+            const playerName = $("name-input").value
             apiGet("/create-game", { playerName }).then(res => {
-                playerId = res.playerId
-                playerName = res.playerName
-                gameId = res.gameId
-                setScreen(new MatchScreen())
+                setScreen(new MatchScreen(res))
             }).catch(alert) // TODO: not very helpful
         })
     }
@@ -149,43 +214,19 @@ class MenuScreen extends GameScreen {
     }
 }
 class MatchScreen extends GameScreen {
-    renderNodeId = 'matchFloor'
-    selectedCardsIndices = []  // todo ensure to reset this when necessary
-    get localPlayerAlive() {
-        return game.players.find(p => p.playerId === playerId).alive
+    constructor(params) {
+        super()
+        this.playState = new PlayState(params)
+
+        this.timeout = 500
+        this.renderNodeId = 'matchFloor'
+        this.selectedCardsIndices = []  // todo ensure to reset this when necessary
     }
-    showModal() {
-        return this.isYourTurn() && ModalTurnStates.includes(game.turnState)
-    }
-    get hand() {
-        return game.hands[game.players.find(p => p.playerId === playerId).handIndex] || []
-    }
-    get currentPlayer() {
-        return game.players[game.playerTurn]
-    }
-    isYourTurn() {
-        return this.currentPlayer.playerId === playerId
-    }
-    isGivingFavour() {
-        return game.turnState === 'FAVOUR_RECEIVING' && game.targetPlayerId === playerId
-    }
-    chooseOppEnabled() {
-        return this.isYourTurn() && ChooseOppTurnStates.includes(game.turnState)
+    get matchState() {
+        return this.playState.game.matchState
     }
     onEnter() {
-        this.clickRestart = false // TODO: remove this entirely, use game state
-        this.interval = setInterval(() => {
-            // query state
-            apiGet("/state", { gameId }).then(newState => {
-                if (!compareState(game, newState)) {
-                    game = newState
-                    if (game.matchState != MatchState.COMPLETE) {
-                        this.clickRestart = false
-                    }
-                    render()
-                }
-            })
-        }, 500)
+        this.interval = setInterval(this.playState.getState.bind(this.playState), this.timeout)
         document.body.innerHTML = this.renderMatch()
         this.renderNode = $(this.renderNodeId)
     }
@@ -193,62 +234,67 @@ class MatchScreen extends GameScreen {
         clearInterval(this.interval)
     }
     onRender() {
-        if (game.matchState === MatchState.PLAYING) {
-            return `
-                <div id="matchPlayCont">
-                    <div id="matchPlayersTop">${this.renderOppHand('top')}</div>
-                    <div id="matchPlayBottom">
-                        <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
-                        <div id="matchPlayArea">
-                            <div id="matchStacks">
-                                <div class="matchCardStackCont" id="matchDiscardStack">
-                                    <span>Discard</span>
-                                    <hr>
-                                    <div class="matchCardStack">
-                                        ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                    </div>
-                                </div>
-                                <div class="matchCardStackCont" id="matchRemStack">
-                                    <span>Deck</span>
-                                    <hr>
-                                    <div class="matchCardStack">
-                                        ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                    </div>
-                                </div>
-                                <div id="matchPlayAreaActions">
-                                    <button id="pick-button">pick</button>
-                                </div>
-                            </div>
-                            ${this.renderPlayInfo()}
-                        </div>
-                        <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
-                    </div>
-                </div>
-                <div id='playerSection'>
-                    <div id='playerHandCont'>
-                        <div class="playerHandAligner"></div>
-                        <div id='playerHand'>
-                            ${this.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
-                        </div>
-                        <div class="playerHandAligner"></div>
-                    </div>
-                    <div id="playerHandActionsCont">
-                        <div id="playerHandActions">
-                            <button id="play-button">play</button>
-                            ${this.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
-                        </div>
-                        <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
-                    </div>
-                </div>
-                ${this.showModal() ? modal() : ''}
-                `
-        } else if (game.matchState === MatchState.WAITING) {
+        const { playerId, playerName, gameId } = this.playState
+        if (this.matchState === MatchState.PLAYING) {
+            return this.renderMatchPlay()
+        } else if (this.matchState === MatchState.WAITING) {
             return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p>`
         } else {
-            return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Game over! Winner: ${game.winner}</p>
-            ${this.clickRestart ? `<span>waiting for other players...</span>` : `<button id="restart-button">play again</button>`}
-            <button id="exit-button">exit</button>` // TODO: exit button / maybe a restart button
+            return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Game over! Winner: ${this.playState.game.winner}</p>
+            ${this.playState.player.ready ? `<span>waiting for other players...</span>` : `<button id="restart-button">play again</button>`}
+            <button id="exit-button">exit</button>`
         }
+    }
+    renderMatchPlay() {
+        const { playerId, playerName, gameId, game } = this.playState
+        return `
+            <div id="matchPlayCont">
+                <div id="matchPlayersTop">${this.renderOppHand('top')}</div>
+                <div id="matchPlayBottom">
+                    <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
+                    <div id="matchPlayArea">
+                        <div id="matchStacks">
+                            <div class="matchCardStackCont" id="matchDiscardStack">
+                                <span>Discard</span>
+                                <hr>
+                                <div class="matchCardStack">
+                                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                                </div>
+                            </div>
+                            <div class="matchCardStackCont" id="matchRemStack">
+                                <span>Deck</span>
+                                <hr>
+                                <div class="matchCardStack">
+                                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                                </div>
+                            </div>
+                            <div id="matchPlayAreaActions">
+                                <button id="pick-button">pick</button>
+                            </div>
+                        </div>
+                        ${this.renderPlayInfo()}
+                    </div>
+                    <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
+                </div>
+            </div>
+            <div id='playerSection'>
+                <div id='playerHandCont'>
+                    <div class="playerHandAligner"></div>
+                    <div id='playerHand'>
+                        ${this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
+                    </div>
+                    <div class="playerHandAligner"></div>
+                </div>
+                <div id="playerHandActionsCont">
+                    <div id="playerHandActions">
+                        <button id="play-button">play</button>
+                        ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
+                    </div>
+                    <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
+                </div>
+            </div>
+            ${this.playState.showModal() ? modal(this.playState) : ''}
+        `
     }
     renderCard(c, i) {
         return `
@@ -260,10 +306,10 @@ class MatchScreen extends GameScreen {
     }
     renderOppHand(pos) {
         const n = {left: 1, top: 2, right: 3}[pos]
-        const player = game.players[(game.players.findIndex(p => p.playerId === playerId) + n) % 4]
-        const len = game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
+        const player = this.playState.getNthPlayer(n)
+        const len = this.playState.game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
         return `
-            <div class="oppHandCont${this.chooseOppEnabled() ? ' enabled' : ''}" id="oppHand-${player.playerId}">
+            <div class="oppHandCont${this.playState.chooseOppEnabled() ? ' enabled' : ''}" id="oppHand-${player.playerId}">
                 <div class="fdCard fdCardOpp">${len}</div>
                 <div class="oppPlayerInfo">${player.playerName}</div>
             </div>
@@ -273,11 +319,11 @@ class MatchScreen extends GameScreen {
         return `
             <div id="playInfo">
                 <div>
-                    ${this.isYourTurn() ? 'your' : this.currentPlayer.playerName+"'s"} turn...
-                    ${this.localPlayerAlive ? "" : "YOU ARE DEAD!"}
+                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...
+                    ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
                 </div>
                 <div>
-                    ${getTurnStateMsg()}                
+                    ${getTurnStateMsg(this.playState)}                
                 </div>
             </div>
         `
@@ -291,14 +337,14 @@ class MatchScreen extends GameScreen {
     }
     validateCardsForPlay() {
         return true  // todo enable front end validation when ready
-        if (this.isYourTurn()) {
+        if (this.playState.isYourTurn()) {
             // todo finish the rules here
             // todo can nope be played when it's your turn?
             return this.selectedCardsIndices.length
         }
         else {
             // todo also check the turnState is nope-able
-            return this.selectedCardsIndices.length === 1 && this.hand[this.selectedCardsIndices[0]].name === 'NOPE'
+            return this.selectedCardsIndices.length === 1 && this.playState.hand[this.selectedCardsIndices[0]].name === Cards.NOPE.name
         }
     }
     buttonIsDisabled(id) {
@@ -311,15 +357,18 @@ class MatchScreen extends GameScreen {
         }
     }
     bindEvents() {
-        if (game && game.hands.length) {
-            for (let i = 0; i < this.hand.length; i++) {
+        const { game, playerId } = this.playState
+
+        // player selects their cards when clicked
+        if (this.matchState === MatchState.PLAYING) {
+            for (let i = 0; i < this.playState.hand.length; i++) {
                 $(`hand-card-${i}`).addEventListener("click", (e) => {
                     if (this.selectedCardsIndices.includes(i)) {
                         this.selectedCardsIndices = this.selectedCardsIndices.filter(c => c!== i)
                         $(`hand-card-${i}`).classList.remove('fuCardSelected')
                     }
                     else {
-                        if (this.isGivingFavour()) {
+                        if (this.playState.isGivingFavour()) {
                             this.selectedCardsIndices = []
                             document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
                         }
@@ -331,13 +380,13 @@ class MatchScreen extends GameScreen {
             }
         }
 
+        // check whether to disable any buttons
         document.querySelectorAll('button').forEach(b => b.disabled = this.buttonIsDisabled(b.id))
 
         $("pick-button")?.addEventListener("click", e => {
             apiPost("/action", {
                 action: "pick",
-                gameId: gameId,
-                playerId: playerId
+                ...this.playState.apiParams()
             }).catch(alert)
         })
 
@@ -345,9 +394,8 @@ class MatchScreen extends GameScreen {
             console.log("PLAY")
             apiPost("/action", {
                 action: "play",
-                gameId: gameId,
-                playerId: playerId,
-                cardIndices: this.selectedCardsIndices
+                cardIndices: this.selectedCardsIndices,
+                ...this.playState.apiParams()
             }).then(() => {
                 this.selectedCardsIndices = []
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
@@ -356,17 +404,17 @@ class MatchScreen extends GameScreen {
 
         $("restart-button")?.addEventListener("click", () => {
             console.log("RESTART")
-            this.clickRestart = true
-            apiPost("/action", { gameId, playerId, action: "restart" })
+            apiPost("/action", { action: "restart", ...this.playState.apiParams() }).catch(alert)
         })
 
         $("exit-button")?.addEventListener("click", () => {
             console.log("EXIT")
-            apiGet("/leave", { gameId, playerId })
+            apiGet("/leave", { ...this.playState.apiParams() }).catch(alert)
             setScreen(new MenuScreen())
         })
 
-        if (game && game.matchState === MatchState.PLAYING && this.chooseOppEnabled()) {
+        // handle clicking on a player
+        if (game.matchState === MatchState.PLAYING && this.playState.chooseOppEnabled()) {
             game.players.forEach(p => {
                 if (p.playerId === playerId) {
                     return
@@ -375,34 +423,33 @@ class MatchScreen extends GameScreen {
                     console.log('CLICKED PLAYER', p.playerName, p.playerId)
                     apiPost("/action", {
                         action: "clicked-player",
-                        gameId: gameId,
-                        playerId: playerId,
-                        targetPlayerId: p.playerId
+                        targetPlayerId: p.playerId,
+                        ...this.playState.apiParams()
                     }).catch(alert)
                 })
             })
         }
 
+        // handle clicking on other player's fanned out cards (combo2)
         document.querySelectorAll('#combo2OppHand .fdCard').forEach(c => {
             const index = parseInt(c.id.split('-').pop())
             c.addEventListener('click', () => {
                 console.log(`${index} card clicked`)
                 apiPost("/action", {
                     action: "clicked-card",
-                    gameId: gameId,
-                    playerId: playerId,
-                    targetCardIndex: index
+                    targetCardIndex: index,
+                    ...this.playState.apiParams()
                 }).catch(alert)
             })
         })
 
+        // handle giving a selected card (favour)
         $("give-button")?.addEventListener("click", () => {
             console.log("PLAY")
             apiPost("/action", {
                 action: "clicked-card",
-                gameId: gameId,
-                playerId: playerId,
-                targetCardIndex: this.selectedCardsIndices[0]
+                targetCardIndex: this.selectedCardsIndices[0],
+                ...this.playState.apiParams()
             }).then(() => {
                 this.selectedCardsIndices = []
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
@@ -468,7 +515,7 @@ const _isObject = obj => obj === Object(obj)
 
 
 const compareState = (oldState, newState) => {
-    const keys1 = ['matchState', 'turnState', 'playerTurn', 'attackedId', 'targetPlayerId']
+    const keys1 = ['matchState', 'turnState', 'playerTurn', 'attackedId', 'targetPlayerId', 'winner']
 
     for (let key of keys1) {
         if (oldState[key] !== newState[key]) {
@@ -477,10 +524,13 @@ const compareState = (oldState, newState) => {
     }
 
     const keys2 = ['hands', 'players']
+    const keys3 = ['discard', 'remainder']
 
-    for (let key of keys2) {
-        if (!objEqual(oldState[key], newState[key])) {
-            return false
+    for (let _keys of [keys2, keys3]) {
+        for (let key of _keys) {
+            if (!objEqual(oldState[key], newState[key])) {
+                return false
+            }
         }
     }
 
@@ -488,12 +538,12 @@ const compareState = (oldState, newState) => {
         return false
     }
 
-    // todo watch out for when to enable the below
-    const keys3 = ['discard', 'remainder']
+    const keys4 = []
     const keys = [].concat(keys1, keys2, keys3)
-    Object.keys(newState).forEach(k => {if (!keys.includes(k)) keys3.push(k)})
-    
-    for (let key of keys3) {
+    Object.keys(oldState).forEach(k => {if (!keys.includes(k) && !keys4.includes(k)) keys4.push(k)})
+    Object.keys(newState).forEach(k => {if (!keys.includes(k) && !keys4.includes(k)) keys4.push(k)})
+
+    for (let key of keys4) {
         if (!_isObjEqual(oldState[key], newState[key])) {
             return false
         }
@@ -503,12 +553,12 @@ const compareState = (oldState, newState) => {
 }
 
 
-const modal = () => {
+const modal = (state) => {
     return `
 <div class="modal fade show" id="exampleModalCenter" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-        ${modalContent()}
+        ${modalContent(state)}
     </div>
   </div>
 </div>
@@ -517,15 +567,18 @@ const modal = () => {
 `
 }
 
-const modalContent = () => {
-    if (game.turnState === 'COMBO2_STEALING') {
-        return combo2StealingModal()
+const modalContent = (state) => {
+    if (state.turnState === TS_COMBO2_STEALING) {
+        return combo2StealingModal(state)
+    }
+    if (state.turnState === TS_DEFUSING) {
+        return `defusing bomb...`
     }
     return ''
 }
 
-const combo2StealingModal = () => {
-    const len = game.hands[game.players.find(p => p.playerId === game.targetPlayerId).handIndex].length  // todo this comes from server eventually
+const combo2StealingModal = (state) => {
+    const len = state.game.hands[state.targetPlayer.handIndex].length  // todo this comes from server eventually
     return `
     <div id="combo2OppHand">
     ${Array.from({length: len}, (_, i) => `<div class="fdCard" id="combo2pick-${i}"></div>`).join('')}
