@@ -157,6 +157,7 @@ button[disabled] {
 .fuCard {
     margin: 10px 15px;
     padding: 15px;
+    color: #000000;
     background-color: #ffffff;
     box-shadow: 2px 2px 7px 2px rgba(0, 0, 0, 0.5);
     border-radius: 10px;
@@ -328,7 +329,29 @@ button[disabled] {
 
 #combo2OppHand {
     display: flex;
+    max-width: 100vw;
+    overflow-x: auto;
 }
 #combo2OppHand .fdCard {
     margin: 10px;
+}
+
+#combo3AllOptions {
+    display: flex;
+    flex-direction: column;
+}
+.combo3OptionsRow {
+    display: flex;
+}
+#combo3AllOptions .fuCard {
+    margin: 5px;
+}
+
+#combo5DiscardPile {
+    display: flex;
+    max-width: 100vw;
+    overflow-x: auto;
+}
+#combo5DiscardPile .fuCard {
+    margin: 5px;
 }

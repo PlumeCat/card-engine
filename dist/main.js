@@ -5,6 +5,11 @@
 // const Cards = import("/cards.js")
 import Cards from "/cards.js"
 
+const getShortCardName = cardName => cardName.split('_').pop().substr(0, 3)
+
+const getCardInnerHtml = c => `<div class="fuCardInner"> ${c.displayName || c.name.replace('_', ' ')}</div>`
+
+
 const MatchState = {
     WAITING: 0,
     PLAYING: 1,
@@ -36,8 +41,9 @@ const ModalTurnStates = [
 ]
 
 const getTurnStateMsg = (state) => {
-    const currentPlayer = `<b>${state.currentPlayer.playerName}</b>`
-    const targetPlayer = `<b>${state.targetPlayer?.playerName}</b>`
+    const bold = b => `<b>${b}</b>`
+    const currentPlayer = bold(state.currentPlayer.playerName)
+    const targetPlayer = bold(state.targetPlayer?.playerName)
 
     const isPlayer = state.playerId === state.currentPlayer.playerId
     const isTarget = state.playerId === state.game.targetPlayerId
@@ -54,11 +60,20 @@ const getTurnStateMsg = (state) => {
     }
     if (turnState === TS_COMBO2_STEALING) {
         return isPlayer ? `pick a card from ${targetPlayer}'s hand`
-             : isTarget ? `your cards are fanned out for ${currentPlayer} to grab one!`
+             : isTarget ? `${bold('your')} cards are fanned out for ${currentPlayer} to grab one!`
              : `${currentPlayer} is picking a card from ${targetPlayer}'s hand`
     }
+    if (turnState === TS_COMBO3_NOMINATING) {
+        return isPlayer ? `nominate a card to request from ${targetPlayer}`
+             : isTarget ? `${currentPlayer} is nominating a card to request from ${bold('you')}`
+             : `${currentPlayer} is nominating a card to request from ${targetPlayer}`
+    }
+    if (turnState === TS_COMBO5_RECLAIMING) {
+        return isPlayer ? `pick a card from the discard pile...`
+             : `${currentPlayer} is reclaiming a card from the discard pile...`
+    }
     if (turnState === TS_DEFUSING) {
-        return isPlayer ? ''
+        return isPlayer ? 'unlucky'
              : `${currentPlayer} picked a bomb! defusing...`
     }
     return ''
@@ -298,10 +313,8 @@ class MatchScreen extends GameScreen {
     }
     renderCard(c, i) {
         return `
-        <div id="hand-card-${i}" class="fuCard fuCard${c.name.split('_').pop().substr(0, 3)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
-            <div class="fuCardInner">
-                ${c.displayName || c.name.replace('_', ' ')}
-            </div>
+        <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c.name)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
+            ${getCardInnerHtml(c)}
         </div>`
     }
     renderOppHand(pos) {
@@ -323,7 +336,7 @@ class MatchScreen extends GameScreen {
                     ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
                 </div>
                 <div>
-                    ${getTurnStateMsg(this.playState)}                
+                    ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
                 </div>
             </div>
         `
@@ -432,6 +445,32 @@ class MatchScreen extends GameScreen {
 
         // handle clicking on other player's fanned out cards (combo2)
         document.querySelectorAll('#combo2OppHand .fdCard').forEach(c => {
+            const index = parseInt(c.id.split('-').pop())
+            c.addEventListener('click', () => {
+                console.log(`${index} card clicked`)
+                apiPost("/action", {
+                    action: "clicked-card",
+                    targetCardIndex: index,
+                    ...this.playState.apiParams()
+                }).catch(alert)
+            })
+        })
+
+        // handle nominating a card (combo3)
+        document.querySelectorAll('#combo3AllOptions .fuCard').forEach(c => {
+            const cardVal = parseInt(c.id.split('-').pop())
+            c.addEventListener('click', () => {
+                console.log(`${cardVal} card nominated`)
+                apiPost("/action", {
+                    action: "clicked-card",
+                    targetCard: cardVal,
+                    ...this.playState.apiParams()
+                }).catch(alert)
+            })
+        })
+
+        // handle reclaiming a card (combo5)
+        document.querySelectorAll('#combo5DiscardPile .fuCard').forEach(c => {
             const index = parseInt(c.id.split('-').pop())
             c.addEventListener('click', () => {
                 console.log(`${index} card clicked`)
@@ -559,6 +598,7 @@ const modal = (state) => {
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
         ${modalContent(state)}
+        ${modalFooter(state)}
     </div>
   </div>
 </div>
@@ -571,6 +611,12 @@ const modalContent = (state) => {
     if (state.turnState === TS_COMBO2_STEALING) {
         return combo2StealingModal(state)
     }
+    if (state.turnState === TS_COMBO3_NOMINATING) {
+        return combo3NominatingModal()
+    }
+    if (state.turnState === TS_COMBO5_RECLAIMING) {
+        return combo5ReclaimingModal(state)
+    }
     if (state.turnState === TS_DEFUSING) {
         return `defusing bomb...`
     }
@@ -582,6 +628,38 @@ const combo2StealingModal = (state) => {
     return `
     <div id="combo2OppHand">
     ${Array.from({length: len}, (_, i) => `<div class="fdCard" id="combo2pick-${i}"></div>`).join('')}
+    </div>
+    `
+}
+
+const combo3NominatingModal = () => {
+    const half2 = Object.values(Cards).filter(c => c.name !== Cards.BOMB.name)
+    const half1 = half2.splice(0, half2.length / 2)
+    console.log([...half1, ...half2])
+    return `
+    <div id="combo3AllOptions">
+        ${[half1, half2].reduce((u, h) => u + `
+            <div class="combo3OptionsRow">
+                ${h.reduce((v, c) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
+            </div>
+        `, "")}
+    </div>
+    `
+}
+
+const combo5ReclaimingModal = (state) => {
+    return `
+    <div id="combo5DiscardPile">
+        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
+    </div>
+    `
+}
+
+const modalFooter = (state) => {
+    return `
+    <div>
+        <hr>
+        ${getTurnStateMsg(state)}                
     </div>
     `
 }
