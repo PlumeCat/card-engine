@@ -298,12 +298,13 @@ class MatchScreen extends GameScreen {
                     <div id='playerHand'>
                         ${this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
                     </div>
-                    <div id="playerHandActionsCont">
-                        <div id="playerHandActions">
-                            <button id="play-button">play</button>
-                            <button id="nope-button">nope</button>
-                            ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
-                        </div>
+                    <div class="playerHandAligner"></div>
+                </div>
+                <div id="playerHandActionsCont">
+                    <div id="playerHandActions">
+                        <button id="play-button">play</button>
+                        <button id="nope-button">nope</button>
+                        ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
                     </div>
                     <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                 </div>
