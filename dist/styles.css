@@ -163,7 +163,7 @@ button[disabled] {
     border-radius: 10px;
     cursor: pointer;
 }
-.fuCard:hover {
+.fuCard:not(.fuCardBOM):hover {
     box-shadow: 0 0 5px 3px orange;
 }
 .fuCardSelected, .fuCardSelected:hover {
@@ -192,7 +192,7 @@ button[disabled] {
 .fuCardFUT .fuCardInner { background-color: #f68ebc; box-shadow: 0 0 3px 5px #ed1e7a; }
 .fuCardDEF .fuCardInner { background-color: #c5e29f; box-shadow: 0 0 3px 5px #8cc640; }
 .fuCardBOM .fuCardInner { background-color: #050505; box-shadow: 0 0 3px 5px #ef7529; }
-.fuCardBOM              { background-color: #050505; color: #ef7529; }
+.fuCardBOM              { background-color: #050505; color: #ef7529; cursor: default; }
 
 .fdCard {
     padding: 15px;
@@ -354,4 +354,31 @@ button[disabled] {
 }
 #combo5DiscardPile .fuCard {
     margin: 5px;
+}
+
+#defusingRemPile {
+    display: flex;
+    max-width: 100vw;
+    overflow-x: auto;
+    align-items: stretch;
+    margin: 5px;
+}
+#defusingRemPile .fuCard {
+    margin: 5px;
+}
+
+#defusingRemPile .defusingRemPick {
+    cursor: pointer;
+    min-width: 15px;
+    margin: 3px;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#defusingRemPile .defusingRemPick:hover {
+    box-shadow: 0 0 5px 3px orange;
+}
+#defusingRemPile .fdCard {
+    min-width: 25px;
 }

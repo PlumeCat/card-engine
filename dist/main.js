@@ -50,8 +50,14 @@ const getTurnStateMsg = (state) => {
 
     const turnState = state.turnState
 
-    if (ChooseOppTurnStates.includes(turnState)) {
-        return isPlayer ? 'choose a player' : ''
+    if (turnState.startsWith('NOPE_')) {
+        const noper = `<b>${state.game.players.find(p => p.playerId === state.game.noperId).playerName}</b>`
+        return `${state.prevTurnStateMsg}. "NOPE${'!'.repeat(state.prevTurnStateMsg.split('NOPE!').length)}" - ${noper}.`
+    }
+    if (turnState.startsWith('PLAYING_')) {
+        const chooseOpp = ChooseOppTurnStates.includes(turnState)
+        return isPlayer && chooseOpp ? 'choose a player'
+            : `${currentPlayer} is playing "${turnState.replace('PLAYING_', '').split('_').join(' ')}"${chooseOpp ? ', and choosing a player...' : ''}`
     }
     if (turnState === TS_FAVOUR_RECEIVING) {
         return isPlayer ? `waiting for card from ${targetPlayer}`
@@ -73,7 +79,7 @@ const getTurnStateMsg = (state) => {
              : `${currentPlayer} is reclaiming a card from the discard pile...`
     }
     if (turnState === TS_DEFUSING) {
-        return isPlayer ? 'unlucky'
+        return isPlayer ? 'pick a position to reinsert the bomb...'
              : `${currentPlayer} picked a bomb! defusing...`
     }
     return ''
@@ -132,6 +138,7 @@ class PlayState {
             matchState: MatchState.WAITING,
             players: [],
             hands: [],
+            attackedId: null,
             winner: ""
         }
     }
@@ -155,10 +162,22 @@ class PlayState {
         apiGet("/state", { gameId: this.gameId })
             .then(newState => {
                 if (newState && !compareState(this.game, newState)) {
+                    if (newState.turnState !== this.turnState && this.game.matchState === MatchState.PLAYING) {
+                        this.prevTurnStateMsg = getTurnStateMsg(this)
+                    }
+                    this.handleAttackTurn(newState)
                     this.game = newState
                     render()
                 }
             }).catch(console.error)
+    }
+    handleAttackTurn(newState) {
+        if (newState.attackedId !== this.game.attackedId) {
+            this.attackedTurn = newState.attackedId !== null ? 1 : 2
+        }
+        else if (newState.attackedId === null) {
+            this.attackedTurn = null
+        }
     }
     isYourTurn() {
         return this.currentPlayer.playerId === this.playerId
@@ -333,7 +352,7 @@ class MatchScreen extends GameScreen {
         return `
             <div id="playInfo">
                 <div>
-                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...
+                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
                     ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
                 </div>
                 <div>
@@ -500,6 +519,19 @@ class MatchScreen extends GameScreen {
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
             }).catch(alert)
         })
+
+        // handle reinserting a card (defusing)
+        document.querySelectorAll('#defusingRemPile .defusingRemPick').forEach(c => {
+            const index = parseInt(c.id.split('-').pop())
+            c.addEventListener('click', () => {
+                apiPost("/action", {
+                    action: "submit-slider",
+                    insertPos: index,
+                    ...this.playState.apiParams()
+                }).catch(alert)
+            })
+        })
+
     }
 }
 
@@ -624,7 +656,7 @@ const modalContent = (state) => {
         return combo5ReclaimingModal(state)
     }
     if (state.turnState === TS_DEFUSING) {
-        return `defusing bomb...`
+        return defusingModal(state)
     }
     return ''
 }
@@ -657,6 +689,16 @@ const combo5ReclaimingModal = (state) => {
     return `
     <div id="combo5DiscardPile">
         ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
+    </div>
+    `
+}
+
+const defusingModal = (state) => {
+    const len = state.game.remainder.length  // todo this comes from server eventually ?
+    return `
+    <div id="defusingRemPile">
+        ${Array.from({length: len}, (_, i) => `<div class="defusingRemPick" id="defusingRemPick-${i}">${i ? `${i}` : 'top'}</div><div class="fdCard"></div>`).join('')}
+        <div class="defusingRemPick" id="defusingRemPick-${len}">bottom</div>
     </div>
     `
 }
