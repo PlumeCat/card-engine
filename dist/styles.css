@@ -166,7 +166,7 @@ button[disabled] {
 .fuCard:not(.fuCardBOM):hover {
     box-shadow: 0 0 5px 3px orange;
 }
-.fuCardSelected, .fuCardSelected:hover {
+.fuCardSelected, .fuCardSelected:not(.fuCardBOM):hover {
     box-shadow: 0 0 5px 3px orangered;
 }
 .fuCardInner {
@@ -238,13 +238,31 @@ button[disabled] {
 .oppHandCont {
     display: flex;
     flex-direction: column;
-    padding: 3px;
+    padding: 5px;
     border-radius: 5px;
 }
-.oppHandCont.enabled, #combo2OppHand .fdCard {
+.oppHandCont.dead {
+    opacity: 0.5;
+}
+.oppHandCont.enabled {
+    cursor: pointer;
+    animation: 0.75s infinite alternate pulse;
+}
+@keyframes pulse {
+    0%   {box-shadow: 0 0 5px 3px rgba(144, 238, 144, 0.25);}
+    100% {box-shadow: 0 0 5px 3px rgba(144, 238, 144, 0.75);}
+}
+.oppHandCont.enabled:hover {
+    animation: 1s infinite pulseHover;
+}
+@keyframes pulseHover {
+    0%, 100% {box-shadow: 0 0 5px 3px orange}
+}
+
+#combo2OppHand .fdCard {
     cursor: pointer;
 }
-.oppHandCont.enabled:hover, #combo2OppHand .fdCard:hover {
+#combo2OppHand .fdCard:hover {
     box-shadow: 0 0 5px 3px orange;
 }
 

@@ -143,13 +143,13 @@ class PlayState {
         }
     }
     get player() {
-        return this.game.players.find(p => p.playerId === this.playerId)
+        return this.getPlayer(this.playerId)
     }
     get currentPlayer() {
         return this.game.players[this.game.playerTurn]
     }
     get targetPlayer() {
-        return this.game.players.find(p => p.playerId === this.game.targetPlayerId)
+        return this.getPlayer(this.game.targetPlayerId)
     }
     get hand() {
         return this.game.hands[this.player.handIndex] || []
@@ -182,6 +182,13 @@ class PlayState {
     isYourTurn() {
         return this.currentPlayer.playerId === this.playerId
     }
+    getPlayer(player) {
+        // player == player or playerId
+        if (player && player.hasOwnProperty('playerId')) {
+            return player
+        }
+        return this.game.players.find(p => p.playerId === player)
+    }
     getNthPlayer(n) {
         return this.game.players[(this.game.players.findIndex(p => p.playerId === this.playerId) + n) % 4]
     }
@@ -193,6 +200,15 @@ class PlayState {
     }
     chooseOppEnabled() {
         return this.isYourTurn() && ChooseOppTurnStates.includes(this.turnState)
+    }
+    playerAvailable(player) {
+        return this.playerAlive(player) && this.playerCardCount(player)
+    }
+    playerAlive(player) {
+        return this.getPlayer(player).alive
+    }
+    playerCardCount(player) {
+        return this.game.hands[this.getPlayer(player).handIndex].length   // this will eventually just come from the server (wont send details of other players hands)
     }
     apiParams() {
         return {
@@ -340,10 +356,16 @@ class MatchScreen extends GameScreen {
     renderOppHand(pos) {
         const n = {left: 1, top: 2, right: 3}[pos]
         const player = this.playState.getNthPlayer(n)
-        const len = this.playState.game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
+        const alive = this.playState.playerAlive(player)
+        const len = this.playState.playerCardCount(player)
+        const classes = [
+            'oppHandCont',
+            (this.playState.chooseOppEnabled() && this.playState.playerAvailable(player)) ? 'enabled' : '',
+            !alive ? 'dead' : '',
+        ].filter(c => c).join(' ')
         return `
-            <div class="oppHandCont${this.playState.chooseOppEnabled() ? ' enabled' : ''}" id="oppHand-${player.playerId}">
-                <div class="fdCard fdCardOpp">${len}</div>
+            <div class="${classes}" id="oppHand-${player.playerId}">
+                <div class="fdCard fdCardOpp">${alive ? len : ''}</div>
                 <div class="oppPlayerInfo">${player.playerName}</div>
             </div>
         `
@@ -454,7 +476,7 @@ class MatchScreen extends GameScreen {
         // handle clicking on a player
         if (game.matchState === MatchState.PLAYING && this.playState.chooseOppEnabled()) {
             game.players.forEach(p => {
-                if (p.playerId === playerId) {
+                if (p.playerId === playerId || !this.playState.playerAvailable(p)) {
                     return
                 }
                 $(`oppHand-${p.playerId}`).addEventListener('click', () => {
@@ -662,7 +684,7 @@ const modalContent = (state) => {
 }
 
 const combo2StealingModal = (state) => {
-    const len = state.game.hands[state.targetPlayer.handIndex].length  // todo this comes from server eventually
+    const len = state.playerCardCount(state.targetPlayer)
     return `
     <div id="combo2OppHand">
     ${Array.from({length: len}, (_, i) => `<div class="fdCard" id="combo2pick-${i}"></div>`).join('')}
