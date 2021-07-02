@@ -275,6 +275,7 @@ class MatchScreen extends GameScreen {
         this.selectedCardsIndices = []  // todo ensure to reset this when necessary
         this.currentDropZone = null  // todo put these in the new class?
         this.cardsOnLeftQty = null
+        this.debugPiles = false
     }
     get matchState() {
         return this.playState.game.matchState
@@ -307,24 +308,8 @@ class MatchScreen extends GameScreen {
                 <div id="matchPlayBottom">
                     <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
                     <div id="matchPlayArea">
-                        <div id="matchStacks">
-                            <div class="matchCardStackCont" id="matchDiscardStack">
-                                <span>Discard</span>
-                                <hr>
-                                <div class="matchCardStack">
-                                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                </div>
-                            </div>
-                            <div class="matchCardStackCont" id="matchRemStack">
-                                <span>Deck</span>
-                                <hr>
-                                <div class="matchCardStack">
-                                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                </div>
-                            </div>
-                            <div id="matchPlayAreaActions">
-                                <button id="pick-button">pick</button>
-                            </div>
+                        <div id="matchPilesCont">
+                            ${this.renderMatchPiles(game)}
                         </div>
                         ${this.renderPlayInfo()}
                     </div>
@@ -351,6 +336,78 @@ class MatchScreen extends GameScreen {
             ${this.playState.showModal() ? modal(this.playState) : ''}
         `
     }
+    renderMatchPiles(game) {
+        const remainderCount = game.remainder.length <= 10 ? game.remainder.length
+                             : game.remainder.length < 15 ? '10+'
+                             : game.remainder.length < 20 ? '15+'
+                             : '?'
+        const discard = [`
+            <div class="matchCardStackCont" id="matchDiscardStack">
+                <span>Discard</span>
+                <hr>
+                <div class="matchCardStack">
+                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                </div>
+            </div>
+        `, `
+            <div class="matchCardPileCont" id="matchDiscardPile">
+                ${game.discard.length ? `
+                    <div class="fuCardB fuCard${getShortCardName(game.discard[0].name)}" id="matchDiscardPileTop">${getCardInnerHtml(game.discard[0])}</div>
+                ` : `
+                    <div class="fuCardB invis"><div class="fuCardInner"></div></div>
+                `}
+            </div>
+        `]
+        const remainder = [`
+            <div class="matchCardStackCont" id="matchRemStack">
+                <span>Deck</span>
+                <hr>
+                <div class="matchCardStack">
+                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                </div>
+            </div>
+        `, `
+            <div class="matchCardPileCont" id="matchRemPile">
+                <div class="fduCard fuCardB" id="matchRemPileTop"><div class="fuCardInner">${remainderCount}</div></div>
+            </div>
+        `]
+        const pickButton = [`
+            <div id="matchPlayAreaActions">
+                <button id="pick-button">pick</button>
+            </div>
+        `, '']
+
+        return `
+            <div id="matchStacks" class="${this.debugPiles ? '' : 'hidden'}">
+                ${discard[0]}
+                ${remainder[0]}
+                ${this.debugPiles ? pickButton[0] : ''}
+            </div>
+            <div id="matchPiles" class="${this.debugPiles ? 'hidden' : ''}">
+                ${discard[1]}
+                ${remainder[1]}
+                ${this.debugPiles ? '' : pickButton[0]}
+            </div>
+        `
+    }
+    renderPlayInfo() {  // todo remove the outer 'playInfoCont' container, and the checkbox
+        return `
+            <div id="playInfoCont">
+                <div id="playInfo">
+                <div>
+                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
+                    ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
+                </div>
+                <div>
+                    ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
+                </div>
+                </div>
+                <div id="debugCont">
+                    <input type="checkbox" id="debugPilesCheck" ${this.debugPiles ? 'checked' : ''}><label for="debugPilesCheck">debug</label>
+                </div>
+            </div>
+        `
+    }
     renderCard(c, i) {
         return `
         <div id="hand-card-cont-${i}">
@@ -373,19 +430,6 @@ class MatchScreen extends GameScreen {
             <div class="${classes}" id="oppHand-${player.playerId}">
                 <div class="fdCard fdCardOpp">${alive ? len : ''}</div>
                 <div class="oppPlayerInfo">${player.playerName}</div>
-            </div>
-        `
-    }
-    renderPlayInfo() {
-        return `
-            <div id="playInfo">
-                <div>
-                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
-                    ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
-                </div>
-                <div>
-                    ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
-                </div>
             </div>
         `
     }
@@ -487,7 +531,7 @@ class MatchScreen extends GameScreen {
 
                     if (squish) {
                         $(this.renderNodeId).classList.remove('squish')
-                        $$$('#playerHand .fuCard').forEach(c => {
+                        $$$('.fuCard').forEach(c => {
                             for (let k of ['margin-left', 'margin-right', 'padding-left', 'padding-right', 'width', 'height', 'font-size']) {
                                 c.style.removeProperty(k)
                             }
@@ -698,7 +742,7 @@ class MatchScreen extends GameScreen {
         })
 
         // handle nominating a card (combo3)
-        document.querySelectorAll('#combo3AllOptions .fuCard').forEach(c => {
+        document.querySelectorAll('#combo3AllOptions .fuCardB').forEach(c => {
             const cardVal = parseInt(c.id.split('-').pop())
             c.addEventListener('click', () => {
                 console.log(`${cardVal} card nominated`)
@@ -711,7 +755,7 @@ class MatchScreen extends GameScreen {
         })
 
         // handle reclaiming a card (combo5)
-        document.querySelectorAll('#combo5DiscardPile .fuCard').forEach(c => {
+        document.querySelectorAll('#combo5DiscardPile .fuCardB').forEach(c => {
             const index = parseInt(c.id.split('-').pop())
             c.addEventListener('click', () => {
                 console.log(`${index} card clicked`)
@@ -748,6 +792,14 @@ class MatchScreen extends GameScreen {
             })
         })
 
+        $('debugPilesCheck')?.addEventListener('change', e => {
+            if (this.debugPiles !== e.target.checked) {
+                this.debugPiles = e.target.checked
+                $(this.debugPiles ? 'matchPiles': 'matchStacks').classList.add('hidden')
+                $(this.debugPiles ? 'matchStacks': 'matchPiles').classList.remove('hidden')
+                $(this.debugPiles ? 'matchStacks': 'matchPiles').appendChild($('matchPlayAreaActions'))
+            }
+        })
     }
 }
 
@@ -894,7 +946,7 @@ const combo3NominatingModal = () => {
     <div id="combo3AllOptions">
         ${[half1, half2].reduce((u, h) => u + `
             <div class="combo3OptionsRow">
-                ${h.reduce((v, c) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
+                ${h.reduce((v, c) => v + `<div class="fuCardB enabled fuCard${getShortCardName(c.name)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
             </div>
         `, "")}
     </div>
@@ -904,7 +956,7 @@ const combo3NominatingModal = () => {
 const combo5ReclaimingModal = (state) => {
     return `
     <div id="combo5DiscardPile">
-        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
+        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCardB fuCard${getShortCardName(c.name)} ${c.name !== Cards.BOMB.name ? 'enabled': ''}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
     </div>
     `
 }
