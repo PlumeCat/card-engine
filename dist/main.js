@@ -7,7 +7,7 @@ import Cards from "/cards.js"
 
 const getShortCardName = cardName => cardName.split('_').pop().substr(0, 3)
 
-const getCardInnerHtml = c => `<div class="fuCardInner"> ${c.displayName || c.name.replace('_', ' ')}</div>`
+const getCardInnerHtml = c => `<div class="fuCardInner">${c.displayName || c.name.replace('_', ' ')}</div>`
 
 
 const MatchState = {
@@ -89,6 +89,8 @@ const getTurnStateMsg = (state) => {
 // helper functions
 const API_PATH = "//localhost:3000"
 const $ = id => document.getElementById(id)
+const $$ = selector => document.querySelector(selector)  // todo maybe rename these... perhaps actually have a querySelectorAll which uses "$"
+const $$$ = selector => document.querySelectorAll(selector)  // todo this is getting ridiculous
 const makeParams = (params) => (params ? Object.entries(params).reduce((value, entry, i) => value + `${i ? "&" : ""}${encodeURIComponent(entry[0])}=${encodeURIComponent(entry[1])}`, "?") : "")
 const api = (method, path, params, headers, body) => fetch(API_PATH + path + makeParams(params), {
         method: method,
@@ -271,6 +273,8 @@ class MatchScreen extends GameScreen {
         this.timeout = 500
         this.renderNodeId = 'matchFloor'
         this.selectedCardsIndices = []  // todo ensure to reset this when necessary
+        this.currentDropZone = null  // todo put these in the new class?
+        this.cardsOnLeftQty = null
     }
     get matchState() {
         return this.playState.game.matchState
@@ -330,7 +334,7 @@ class MatchScreen extends GameScreen {
             <div id='playerSection'>
                 <div id='playerHandCont'>
                     <div class="playerHandAligner"></div>
-                    <div id='playerHand'>
+                    <div id='playerHand' class="dropZone">
                         ${this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
                     </div>
                     <div class="playerHandAligner"></div>
@@ -349,8 +353,10 @@ class MatchScreen extends GameScreen {
     }
     renderCard(c, i) {
         return `
-        <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c.name)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
-            ${getCardInnerHtml(c)}
+        <div id="hand-card-cont-${i}">
+            <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c.name)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
+                ${getCardInnerHtml(c)}
+            </div>
         </div>`
     }
     renderOppHand(pos) {
@@ -411,6 +417,181 @@ class MatchScreen extends GameScreen {
             return !this.validateCardsForPlay()
         }
     }
+    findDropZoneUnderPoint(x, y) {
+        const dropZones = document.querySelectorAll(".dropZone")
+        for (let i = 0; i < dropZones.length; i++) {
+            const box = dropZones[i].getBoundingClientRect()
+            if (x > box.left && x < box.right && y > box.top && y < box.bottom) {
+              return dropZones[i]
+            }
+        }
+    }
+    handleCardMouseMoveGhost(e, refEl, cardsRem, dropZone) {
+        if (!cardsRem.length) {
+            if (!dropZone.children.length) {
+                dropZone.appendChild($('hand-card-cont-ghost'))
+            }
+            return
+        }
+        const relMouseX = e.clientX - dropZone.offsetLeft
+        const cardWidth = refEl.offsetWidth  // assumes all cards are same dimensions
+        const cardsOnLeftQty = Math.floor((relMouseX + (cardWidth/2) - (cardWidth * this.selectedCardsIndices.length * 0.5)) / cardWidth)
+        if (cardsOnLeftQty === this.cardsOnLeftQty) {
+            return
+        }
+        this.cardsOnLeftQty = cardsOnLeftQty
+        const cardAfter = (this.cardsOnLeftQty >= cardsRem.length) ? null : $(`hand-card-cont-${cardsRem[this.cardsOnLeftQty]}`)
+
+        dropZone.insertBefore($('hand-card-cont-ghost'), cardAfter)
+    }
+    handleCardMouseMove(e, cont, refEl, cardsRem, squish) {
+        e.preventDefault()
+
+        cont.style.top = (e.clientY - (cont.offsetHeight/2)) + "px"
+        cont.style.left = (e.clientX - (cont.offsetWidth/2)) + "px"
+
+        const dropZone = this.findDropZoneUnderPoint(e.clientX, e.clientY)
+
+        if (dropZone !== this.currentDropZone) {
+            if (dropZone) {
+                // -> drag enter zone
+                dropZone.classList.add('dropZoneHover')
+
+                if (dropZone.id === 'playerHand') {
+                    const ghost = document.body.appendChild(document.createElement('div'))
+                    ghost.classList.add('flex')
+                    ghost.id = 'hand-card-cont-ghost'
+                    ghost.innerHTML = `<div class="fuCard"><div class="fuCardInner"></div></div>`.repeat(this.selectedCardsIndices.length)
+
+                    if (squish) {
+                        $(this.renderNodeId).classList.add('squish')
+                        $$$('.fuCard').forEach(c => {
+                            if (squish.margin) {c.style.marginLeft = squish.margin;  c.style.marginRight = squish.margin}
+
+                            if (Object.keys(squish).length > 1) {
+                                c.style.paddingLeft = squish.padding;  c.style.paddingRight = squish.padding
+                                c.firstElementChild.style.width = squish.width; c.firstElementChild.style.height = squish.height
+                                c.firstElementChild.style.fontSize = squish.fontSize
+                            }
+                        })
+                    }
+                }
+            }
+            if (this.currentDropZone) {
+                // -> drag leave zone
+                this.currentDropZone.classList.remove('dropZoneHover')
+                // cont.classList.remove('draggableHandHover')
+                if (this.currentDropZone.id === 'playerHand') {
+                    $('hand-card-cont-ghost').remove()
+                    this.cardsOnLeftQty = null
+
+                    if (squish) {
+                        $(this.renderNodeId).classList.remove('squish')
+                        $$$('#playerHand .fuCard').forEach(c => {
+                            for (let k of ['margin-left', 'margin-right', 'padding-left', 'padding-right', 'width', 'height', 'font-size']) {
+                                c.style.removeProperty(k)
+                            }
+                        })
+                    }
+                }
+            }
+            this.currentDropZone = dropZone
+        }
+
+        if (dropZone && dropZone.id === 'playerHand') {
+            this.handleCardMouseMoveGhost(e, refEl, cardsRem, dropZone)
+        }
+    }
+    handleCardMouseUp(e, cont, cardsRem, _handleCardMouseMove, _handleCardMouseUp) {
+        if (this.currentDropZone && (this.currentDropZone.id === 'playerHand' && $('hand-card-cont-ghost'))) {
+            // drag completed on player hand drop zone
+            $('hand-card-cont-ghost').replaceWith(...cont.children)
+            cardsRem.splice(this.cardsOnLeftQty, 0, ...this.selectedCardsIndices)
+
+            if (!cardsRem.every((c, i) => !i || c > cardsRem[i-1])) {
+                const newSelection = this.selectedCardsIndices.map((_, i) => this.cardsOnLeftQty + i)
+                // card order has changed (is no longer ascending)
+                console.log("UPDATE HAND", cardsRem)
+                apiPost("/action", {
+                    action: "update-hand",
+                    updatedHandIndices: cardsRem,
+                    ...this.playState.apiParams()
+                }).then(() => {
+                    this.selectedCardsIndices = newSelection
+                }).catch(console.error)
+            }
+        }
+        else {
+            // drag cancelled
+            for (let i of this.selectedCardsIndices) {  // todo does this not work properly anymore?
+                $('playerHand').insertBefore($(`hand-card-cont-${i}`), $$(`#playerHand #hand-card-cont-${i + 1}`) || null)
+            }
+        }
+        cont.remove()
+        this.currentDropZone?.classList.remove('dropZoneHover')
+        this.currentDropZone = null
+        this.cardsOnLeftQty = null
+        $(this.renderNodeId).classList.remove('dragging', 'squish')
+
+        window.removeEventListener("mousemove", _handleCardMouseMove)
+        window.removeEventListener("mouseup", _handleCardMouseUp)
+    }
+    handleDragSelectedCards(e, i) {
+        // todo extract all the draggable to its own class
+        // todo cancel drag with esc
+        e.preventDefault()
+
+        if (!this.selectedCardsIndices.includes(i)) {
+            this.selectedCardsIndices.push(i)
+            $(`hand-card-${i}`).classList.add('fuCardSelected')
+        }
+        this.selectedCardsIndices.sort((a, b) => a - b)
+
+        const cardsRem = [...Array(this.playState.hand.length).keys()].filter(j => !this.selectedCardsIndices.includes(j))
+        const refEl = cardsRem.length ? $(`hand-card-cont-${cardsRem[0]}`) : null
+
+        const handLen = this.playState.hand.length
+        let squish
+        if (refEl.offsetWidth * handLen > $('playerHand').offsetWidth) {
+            const winW = window.innerWidth - (5*2)  // 2 x player hand margin 5px (beware magic number!)
+            const minMargin = 5, maxCardP = 15, maxCardW = 75  // hardcoded css values???
+            const cardW = winW / handLen
+            let minMarginCardWidth = (2*minMargin) + (2*maxCardP) + maxCardW
+            if (minMarginCardWidth * handLen < winW) {
+                const margin = Math.floor(minMargin + ((cardW - minMarginCardWidth) / 2))
+                squish = margin < 10 ? { margin: margin + 'px' } : {}  // 10px here being normal card margin
+            }
+            else {
+                const innerW  = Math.floor((cardW - (2*minMargin)) * maxCardW/((2*maxCardP)+maxCardW))
+                const padding = Math.floor((cardW - (2*minMargin)) * maxCardP/((2*maxCardP)+maxCardW))
+                const fontSize = 16 * innerW/maxCardW //  hardcoded css values???
+                squish = {
+                    width: innerW + 'px',
+                    height: Math.floor(4 * innerW / 3) + 'px',
+                    padding: padding + 'px',
+                    margin: minMargin + 'px',
+                    fontSize: fontSize + 'px',
+                }
+            }
+        }
+
+        const cont = document.body.appendChild(document.createElement('div'))
+        cont.id = 'drag-hand-cards'
+        cont.classList.add('draggable', 'flex')
+        for (let idx of this.selectedCardsIndices) {
+            cont.appendChild($(`hand-card-cont-${idx}`))
+        }
+
+        cont.style.top = (e.clientY - (cont.offsetHeight/2)) + "px"
+        cont.style.left = (e.clientX - (cont.offsetWidth/2)) + "px"
+
+        $(this.renderNodeId).classList.add('dragging')
+
+        const handleCardMouseMove = e => this.handleCardMouseMove(e, cont, refEl, cardsRem, squish)
+        const handleCardMouseUp = e => this.handleCardMouseUp(e, cont, cardsRem, handleCardMouseMove, handleCardMouseUp)
+        window.addEventListener("mousemove", handleCardMouseMove)
+        window.addEventListener("mouseup", handleCardMouseUp)
+    }
     bindEvents() {
         const { game, playerId } = this.playState
 
@@ -431,6 +612,19 @@ class MatchScreen extends GameScreen {
                         $(`hand-card-${i}`).classList.add('fuCardSelected')
                     }
                     document.querySelectorAll('#playerHandActions button').forEach(b => {b.disabled = this.buttonIsDisabled(b.id)})
+                })
+                $(`hand-card-${i}`).addEventListener("mousedown", (e) => {
+                    // todo keep cards mousemove-ing if re-render
+                    if (e.button !== 0) {
+                        return
+                    }
+                    this.activeTimer = setTimeout(() => {this.handleDragSelectedCards(e, i)}, 500)
+                    const handleMouseUp = (e) => {
+                        clearTimeout(this.activeTimer)
+                        this.activeTimer = null
+                        window.removeEventListener("mouseup", handleMouseUp)
+                    }
+                    window.addEventListener("mouseup", handleMouseUp)
                 })
             }
         }
