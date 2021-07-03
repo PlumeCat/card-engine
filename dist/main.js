@@ -69,7 +69,7 @@ const getTurnStateMsg = (state) => {
              : isTarget ? `${bold('your')} cards are fanned out for ${currentPlayer} to grab one!`
              : `${currentPlayer} is picking a card from ${targetPlayer}'s hand`
     }
-    if (turnState === TS_COMBO3_NOMINATING) {
+    if (turnState === TS_COMBO3_NOMINATING) {  // todo need msg for what was nominated and whether target player had the card
         return isPlayer ? `nominate a card to request from ${targetPlayer}`
              : isTarget ? `${currentPlayer} is nominating a card to request from ${bold('you')}`
              : `${currentPlayer} is nominating a card to request from ${targetPlayer}`
@@ -330,6 +330,9 @@ class MatchScreen extends GameScreen {
                         ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
                     </div>
                     <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
+                    <div id="debugCont">
+                        <input type="checkbox" id="debugPilesCheck" ${this.debugPiles ? 'checked' : ''}><label for="debugPilesCheck">debug</label>
+                    </div>
                 </div>
             </div>
             ${this.playState.showModal() ? modal(this.playState) : ''}
@@ -351,7 +354,7 @@ class MatchScreen extends GameScreen {
         `, `
             <div class="matchCardPileCont" id="matchDiscardPile">
                 ${game.discard.length ? `
-                    <div class="fuCardB fuCard${getShortCardName(game.discard[0].name)}" id="matchDiscardPileTop">${getCardInnerHtml(game.discard[0])}</div>
+                    <div class="fuCardB fuCard${getShortCardName(game.discard[0].name)}" id="matchDiscardPileTopCard">${getCardInnerHtml(game.discard[0])}</div>
                 ` : `
                     <div class="fuCardB invis"><div class="fuCardInner"></div></div>
                 `}
@@ -367,10 +370,10 @@ class MatchScreen extends GameScreen {
             </div>
         `, `
             <div class="matchCardPileCont" id="matchRemPile">
-                <div class="fduCard fuCardB" id="matchRemPileTop"><div class="fuCardInner">${remainderCount}</div></div>
+                <div class="fduCard fuCardB${this.validToPickCard() ? ' enabled' : ''}" id="matchRemPileTopCard"><div class="fuCardInner">${remainderCount}</div></div>
             </div>
         `]
-        const pickButton = [`
+        const actions = [`
             <div id="matchPlayAreaActions">
                 <button id="pick-button">pick</button>
             </div>
@@ -380,29 +383,24 @@ class MatchScreen extends GameScreen {
             <div id="matchStacks" class="${this.debugPiles ? '' : 'hidden'}">
                 ${discard[0]}
                 ${remainder[0]}
-                ${this.debugPiles ? pickButton[0] : ''}
+                ${actions[0]}
             </div>
             <div id="matchPiles" class="${this.debugPiles ? 'hidden' : ''}">
                 ${discard[1]}
                 ${remainder[1]}
-                ${this.debugPiles ? '' : pickButton[0]}
+                ${actions[1]}
             </div>
         `
     }
-    renderPlayInfo() {  // todo remove the outer 'playInfoCont' container, and the checkbox
+    renderPlayInfo() {
         return `
-            <div id="playInfoCont">
-                <div id="playInfo">
+            <div id="playInfo">
                 <div>
                     ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
                     ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
                 </div>
                 <div>
                     ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
-                </div>
-                </div>
-                <div id="debugCont">
-                    <input type="checkbox" id="debugPilesCheck" ${this.debugPiles ? 'checked' : ''}><label for="debugPilesCheck">debug</label>
                 </div>
             </div>
         `
@@ -438,6 +436,9 @@ class MatchScreen extends GameScreen {
             <div id="${this.renderNodeId}"></div>
         </div>
         `
+    }
+    validToPickCard(){
+        return true  // todo complete this later
     }
     validateCardsForPlay() {
         return true  // todo enable front end validation when ready
@@ -495,6 +496,12 @@ class MatchScreen extends GameScreen {
         document.querySelectorAll('button').forEach(b => b.disabled = this.buttonIsDisabled(b.id))
 
         $("pick-button")?.addEventListener("click", e => {
+            apiPost("/action", {
+                action: "pick",
+                ...this.playState.apiParams()
+            }).catch(alert)
+        })
+        $("matchRemPileTopCard")?.addEventListener("click", e => {  // todo change form click to draggable
             apiPost("/action", {
                 action: "pick",
                 ...this.playState.apiParams()
@@ -616,7 +623,6 @@ class MatchScreen extends GameScreen {
                 this.debugPiles = e.target.checked
                 $(this.debugPiles ? 'matchPiles': 'matchStacks').classList.add('hidden')
                 $(this.debugPiles ? 'matchStacks': 'matchPiles').classList.remove('hidden')
-                $(this.debugPiles ? 'matchStacks': 'matchPiles').appendChild($('matchPlayAreaActions'))
             }
         })
     }
@@ -840,6 +846,7 @@ class Draggable {
         this.removeListeners()
     }
     cancelDragSelectedCards() {
+        $(this.ghostId)?.remove()  // todo this bug would have been caught earlier if there was a mechanism to auto handle creation and deletion of nodes/classes/props etc
         for (let i of [...this.selectedCardsIndices].reverse()) {
             $('playerHand').insertBefore($(`${this.cardContId}${i}`), $$(`#playerHand #${this.cardContId}${i + 1}`) || null)
         }

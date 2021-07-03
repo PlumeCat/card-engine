@@ -145,6 +145,7 @@ button[disabled] {
     border-radius: 5px;
     min-width: 65px;
     overflow-x: auto;
+    align-items: center;
 }
 
 #playerHandActionsCont {
@@ -348,6 +349,9 @@ button[disabled] {
     text-align: center;
     border-radius: 5px;
 }
+.matchCardPileCont .fuCardB {
+    margin: 20px;
+}
 .matchCardStack {
     height: 150px;
     overflow-y: auto;
@@ -361,16 +365,9 @@ button[disabled] {
     color: #efb429;
 }
 
-/* ====== temp stuff for playInfoCont debug ====== */
-#playInfoCont {
-    display: flex;
-    width: 100%;
-}
-#playInfoCont #playInfo{
-    flex-grow: 1;
-}
-#playInfoCont #debugCont{
-    flex-shrink: 1;
+/* ====== temp stuff for debug ====== */
+#debugCont{
+    text-align: right;
     font-size: 12px;
     color: #888888;
 }
