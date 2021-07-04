@@ -436,6 +436,16 @@ button[disabled] {
     min-width: 25px;
 }
 
+#seeFutureInModal {
+    display: flex;
+    margin: 10px;
+}
+#seeFutureCardCont {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .draggable {
     position: absolute;
     margin: 0;

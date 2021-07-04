@@ -21,6 +21,9 @@ export default (state) => {
 }
 
 const modalContent = (state) => {
+    if (state.turnState === TurnStates.SEE_FUTURE) {
+        return seeFutureModal(state)
+    }
     if (state.turnState === TurnStates.COMBO2_STEALING) {
         return combo2StealingModal(state)
     }
@@ -36,6 +39,20 @@ const modalContent = (state) => {
     return ''
 }
 
+const seeFutureModal = (state) => {
+    const cards = state.game.remainder.slice(0, 3)  // todo this comes from server eventually ?
+    return `    
+    <div id="seeFutureInModal">
+        ${cards.reduce((v, c, i) => v + `
+        <div id="seeFutureCardCont">
+            <div class="fuCardB fuCard${getShortCardName(c.name)}">${getCardInnerHtml(c)}</div>
+            <div>${['top', '2nd', '3rd'][i]} card</div>
+        </div>
+        `, "")}
+    </div>
+    `
+}
+
 const combo2StealingModal = (state) => {
     const len = state.playerCardCount(state.targetPlayer)
     return `
@@ -48,7 +65,6 @@ const combo2StealingModal = (state) => {
 const combo3NominatingModal = () => {
     const half2 = Object.values(Cards).filter(c => c.value !== Cards.BOMB.value)
     const half1 = half2.splice(0, half2.length / 2)
-    console.log([...half1, ...half2])
     return `
     <div id="combo3AllOptions">
         ${[half1, half2].reduce((u, h) => u + `

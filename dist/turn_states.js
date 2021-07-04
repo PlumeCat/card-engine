@@ -7,6 +7,7 @@ export const ChooseOppTurnStates = [
 ]
 
 export const ModalTurnStates = [
+    TurnStates.SEE_FUTURE,
     TurnStates.COMBO2_STEALING,
     TurnStates.COMBO3_NOMINATING,
     TurnStates.COMBO5_RECLAIMING,
@@ -54,6 +55,10 @@ export const getTurnStateMsg = (state) => {
     if (turnState === TurnStates.DEFUSING) {
         return isPlayer ? 'pick a position to reinsert the bomb...'
              : `${currentPlayer} picked a bomb! defusing...`
+    }
+    if (turnState === TurnStates.SEE_FUTURE) {
+        return isPlayer ? 'seeing the future'
+             : `${currentPlayer} is peeking at the top 3 cards...`
     }
     return ''
 }
