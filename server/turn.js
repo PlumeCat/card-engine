@@ -267,7 +267,11 @@ export const TurnStates = {
         const action = params.action
         if (action == "clicked-card") {
             const player = game.players.find(p => p.playerId == params.playerId)
-            const card = game.discard.splice(params.targetCardIndex, 1)[0]
+            const card = game.discard[params.targetCardIndex]
+            if (card == Cards.BOMB) {
+                return
+            }
+            game.discard.splice(params.targetCardIndex, 1)
             game.hands[player.handIndex].push(card)
             return "START"
         }
