@@ -53,6 +53,7 @@ const doNope = (params, game, successState) => {
     // discard the nope
     hand.splice(nopePos, 1)
     game.discard.unshift(Cards.NOPE)
+    game.noperId = params.playerId
     return successState
 }
 
@@ -189,6 +190,7 @@ export const TurnStates = {
         const playerId = params.playerId
         if (action == "clicked-player") {
             // save this player as the target player
+            // todo check target player is alive and has cards? (also check for situations where no player is viable target (all dead/zero cards)
             game.targetPlayerId = params.targetPlayerId
             return "FAVOUR_RECEIVING"
         }
@@ -203,6 +205,7 @@ export const TurnStates = {
         const action = params.action
         if (action == "clicked-player") {
             // save this player as the target player
+            // todo check target player is alive and has cards?
             game.targetPlayerId = params.targetPlayerId
             return "COMBO2_STEALING"
         } else if (action == "nope") {
@@ -213,6 +216,7 @@ export const TurnStates = {
         const action = params.action
         if (action == "clicked-player") {
             // save this player as the target player
+            // todo check target player is alive and has cards?
             game.targetPlayerId = params.targetPlayerId
             return "COMBO3_NOMINATING"
         } else if (action == "nope") {
@@ -250,13 +254,12 @@ export const TurnStates = {
         if (action == "clicked-card") {
             // clicked a card type in the "which card to nominate" popup
             // transfer from targeted player's hand if they have one
-            const targetCard = params.targetCard
             const target = game.players.find(p => p.playerId == game.targetPlayerId)
             const player = game.players.find(p => p.playerId == params.playerId)
             const cardIndex = game.hands[target.handIndex].findIndex(c => c.value == params.targetCard)
             if (cardIndex != -1) {
-                game.hands[player.handIndex].push(targetCard)
-                game.hands[target.handIndex].splice(cardIndex, 1)
+                const card = game.hands[target.handIndex].splice(cardIndex, 1)[0]
+                game.hands[player.handIndex].push(card)
             }
             return "START"
         }
@@ -322,7 +325,7 @@ export const TurnStates = {
         }
     },
 
-    NOPE_FUTURE_ODD: (params, game) => {
+    NOPE_FUTURE_ODD: (params, game) => {  // todo why doesnt multiple nopes work for future?
         if (action == "timer") {
             // nope succeeded
             return "START"
