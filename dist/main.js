@@ -595,6 +595,10 @@ class MatchScreen extends GameScreen {
         // handle giving a selected card (favour)
         $("give-button")?.addEventListener("click", () => {
             console.log("PLAY")
+            if (this.selectedCardsIndices.length != 1) {
+                alert("select 1 card to give")
+                return
+            }
             apiPost("/action", {
                 action: "clicked-card",
                 targetCardIndex: this.selectedCardsIndices[0],

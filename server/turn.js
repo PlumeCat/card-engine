@@ -187,7 +187,6 @@ export const TurnStates = {
     },
     PLAYING_FAVOUR: (params, game) => {
         const action = params.action
-        const playerId = params.playerId
         if (action == "clicked-player") {
             // save this player as the target player
             // todo check target player is alive and has cards? (also check for situations where no player is viable target (all dead/zero cards)
@@ -275,10 +274,15 @@ export const TurnStates = {
     },
     FAVOUR_RECEIVING: (params, game) => {
         const action = params.action
+        console.log("Favour-receiginhg ", params)
         if (action == "clicked-card") {
             const target = game.players.find(p => p.playerId == params.playerId)
             const player = game.players[game.playerTurn]
-            const card = game.hands[target.handIndex].splice(params.targetCardIndex, 1)[0]
+            const hand = game.hands[target.handIndex]
+            if (hand[params.targetCardIndex] === undefined) {
+                return
+            }
+            const card = hand.splice(params.targetCardIndex, 1)[0]
             game.hands[player.handIndex].push(card)
             return "START"
         }
@@ -326,6 +330,7 @@ export const TurnStates = {
     },
 
     NOPE_FUTURE_ODD: (params, game) => {  // todo why doesnt multiple nopes work for future?
+        const action = params.action
         if (action == "timer") {
             // nope succeeded
             return "START"
@@ -412,6 +417,7 @@ export const TurnStates = {
     },
 
     NOPE_SHUFFLE_ODD: (params, game) => {
+        const action = params.action
         if (action == "timer") {
             return "START"
         } else if (action == "nope") {
@@ -419,13 +425,15 @@ export const TurnStates = {
         }
     },
     NOPE_SHUFFLE_EVEN: (params, game) => {
+        const action = params.action
         if (action == "timer") {
             return "SHUFFLING"
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_SHUFFLE_EVEN")
+            return doNope(params, game, "NOPE_SHUFFLE_ODD")
         }
     },
     NOPE_ATTACK_ODD: (params, game) => {
+        const action = params.action
         if (action == "timer") {
             return "START"
         } else if (action == "nope") {
@@ -433,6 +441,7 @@ export const TurnStates = {
         }
     },
     NOPE_ATTACK_EVEN: (params, game) => {
+        const action = params.action
         if (action == "timer") {
             return "ATTACKING"
         } else if (action == "nope") {
@@ -440,6 +449,7 @@ export const TurnStates = {
         }
     },
     NOPE_FAVOUR_ODD: (params, game) => {
+        const action = params.action
         if (action == "timer") {
             return "FAVOUR_RECEIVING"
         } else if (action == "nope") {
@@ -447,6 +457,7 @@ export const TurnStates = {
         }
     },
     NOPE_FAVOUR_EVEN: (params, game) => {
+        const action = params.action
         if (action == "timer") {
             return "START"
         } else if (action == "nope") {
