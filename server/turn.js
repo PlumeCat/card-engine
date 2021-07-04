@@ -267,7 +267,7 @@ export const TurnStates = {
             const player = game.players.find(p => p.playerId == params.playerId)
             const card = game.discard.splice(params.targetCardIndex, 1)[0]
             game.hands[player.handIndex].push(card)
-            return "END"
+            return "START"
         }
     },
     FAVOUR_RECEIVING: (params, game) => {
@@ -306,6 +306,7 @@ export const TurnStates = {
             return "END"
         } else if (action == "submit-slider") {
             game.remainder.splice(params.insertPos, 0, Cards.BOMB)
+            return "END"
         }
     },
     END: (params, game) => {
