@@ -57,9 +57,49 @@ const doNope = (params, game, successState) => {
     return successState
 }
 
+export const TurnStates = [
+    "START",
+    "PLAYING_SEE_FUTURE",
+    "PLAYING_SKIP",
+    "PLAYING_ATTACK",
+    "PLAYING_FAVOUR",
+    "PLAYING_SHUFFLE",
+    "PLAYING_COMBO2",
+    "PLAYING_COMBO3",
+    "PLAYING_COMBO5",
+    "SEE_FUTURE",
+    "COMBO2_STEALING",
+    "COMBO3_NOMINATING",
+    "COMBO5_RECLAIMING",
+    "FAVOUR_RECEIVING",
+    "SHUFFLING",
+    "ATTACKING",
+    "DEFUSING",
+    "END",
 
-export const TurnStates = {
-    START: (params, game, nextAction) => {
+    "NOPE_FUTURE_ODD",
+    "NOPE_FUTURE_EVEN",
+    "NOPE_SKIP_ODD",
+    "NOPE_SKIP_EVEN",
+    "NOPE_COMBO2_ODD",
+    "NOPE_COMBO2_EVEN",
+    "NOPE_COMBO3_ODD",
+    "NOPE_COMBO3_EVEN",
+    "NOPE_COMBO5_ODD",
+    "NOPE_COMBO5_EVEN",
+    "NOPE_ATTACK_ODD",
+    "NOPE_ATTACK_EVEN",
+    "NOPE_SHUFFLE_ODD",
+    "NOPE_SHUFFLE_EVEN",
+    "NOPE_FAVOUR_ODD",
+    "NOPE_FAVOUR_EVEN",
+].reduce((v, s) => {
+    v[s] = s
+    return v
+}, {})
+
+export const TurnStateHandlers = {
+    [TurnStates.START]: (params, game) => {
         const action = params.action
         if (!action) {
             return
@@ -77,23 +117,23 @@ export const TurnStates = {
                 if (card == Cards.SKIP) {
                     // discard the card
                     game.discard.unshift(...hand.splice(params.cardIndices[0], 1))
-                    return "PLAYING_SKIP"
+                    return TurnStates.PLAYING_SKIP
                 } else if (card == Cards.SEE_FUTURE) {
                     // discard the card
                     game.discard.unshift(...hand.splice(params.cardIndices[0], 1))
-                    return "PLAYING_SEE_FUTURE"
+                    return TurnStates.PLAYING_SEE_FUTURE
                 } else if (card == Cards.ATTACK) {
                     // discard the card
                     game.discard.unshift(...hand.splice(params.cardIndices[0], 1))
-                    return "PLAYING_ATTACK"
+                    return TurnStates.PLAYING_ATTACK
                 } else if (card == Cards.SHUFFLE) {
                     // discard dis card
                     game.discard.unshift(...hand.splice(params.cardIndices[0], 1))
-                    return "PLAYING_SHUFFLE"
+                    return TurnStates.PLAYING_SHUFFLE
                 } else if (card == Cards.FAVOUR) {
                     // remoof!
                     game.discard.unshift(...hand.splice(params.cardIndices[0], 1))
-                    return "PLAYING_FAVOUR"
+                    return TurnStates.PLAYING_FAVOUR
                 }
             } else if (params.cardIndices.length == 2) {
                 const cards = params.cardIndices.map(i => hand[i])
@@ -106,7 +146,7 @@ export const TurnStates = {
                 // discard cards
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
                 game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
-                return "PLAYING_COMBO2"
+                return TurnStates.PLAYING_COMBO2
             } else if (params.cardIndices.length == 3) {
                 const cards = params.cardIndices.map(i => hand[i])
                 if (cards[0] != cards[1] || cards[0] != cards[2]) {
@@ -118,7 +158,7 @@ export const TurnStates = {
                 // discard cards
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
                 game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
-                return "PLAYING_COMBO3"
+                return TurnStates.PLAYING_COMBO3
             } else if (params.cardIndices.length == 5) {
                 const cards = params.cardIndices.map(i => hand[i])
                 if ((new Set(cards)).size != 5) {
@@ -126,7 +166,7 @@ export const TurnStates = {
                 }
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
                 game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
-                return "PLAYING_COMBO5"
+                return TurnStates.PLAYING_COMBO5
             }
         } else if (action == "pick") {
             const playerIndex = game.players.findIndex(p => p.playerId == params.playerId)
@@ -141,7 +181,7 @@ export const TurnStates = {
                 if (defusePos != -1) {
                     hand.splice(defusePos, 1)
                     game.discard.unshift(Cards.DEFUSE)
-                    return "DEFUSING"
+                    return TurnStates.DEFUSING
                 } else {
                     game.discard.unshift(Cards.BOMB)
                     game.players[playerIndex].alive = false
@@ -154,90 +194,90 @@ export const TurnStates = {
                         game.winner = winner.playerName
                         throw "VICTORY"
                     }
-                    return "END"
+                    return TurnStates.END
                 }
             } else {
                 hand.push(card)
-                return "END"
+                return TurnStates.END
             }
         }
     },
     
-    PLAYING_SEE_FUTURE: (params, game) => {
+    [TurnStates.PLAYING_SEE_FUTURE]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "SEE_FUTURE"
+            return TurnStates.SEE_FUTURE
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FUTURE_ODD")
+            return doNope(params, game, TurnStates.NOPE_FUTURE_ODD)
         }
     },
-    PLAYING_SKIP: (params, game) => {
+    [TurnStates.PLAYING_SKIP]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "END"
+            return TurnStates.END
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_SKIP_ODD")
+            return doNope(params, game, TurnStates.NOPE_SKIP_ODD)
         }
     },
-    PLAYING_ATTACK: (params, game) => {
+    [TurnStates.PLAYING_ATTACK]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "ATTACKING"
+            return TurnStates.ATTACKING
         }
     },
-    PLAYING_FAVOUR: (params, game) => {
+    [TurnStates.PLAYING_FAVOUR]: (params, game) => {
         const action = params.action
         if (action == "clicked-player") {
             // save this player as the target player
             // todo check target player is alive and has cards? (also check for situations where no player is viable target (all dead/zero cards)
             game.targetPlayerId = params.targetPlayerId
-            return "FAVOUR_RECEIVING"
+            return TurnStates.FAVOUR_RECEIVING
         }
     },
-    PLAYING_SHUFFLE: (params, game) => {
+    [TurnStates.PLAYING_SHUFFLE]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "SHUFFLING"
+            return TurnStates.SHUFFLING
         }
     },
-    PLAYING_COMBO2: (params, game) => {
+    [TurnStates.PLAYING_COMBO2]: (params, game) => {
         const action = params.action
         if (action == "clicked-player") {
             // save this player as the target player
             // todo check target player is alive and has cards?
             game.targetPlayerId = params.targetPlayerId
-            return "COMBO2_STEALING"
+            return TurnStates.COMBO2_STEALING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO2_ODD")
+            return doNope(params, game, TurnStates.NOPE_COMBO2_ODD)
         }
     },
-    PLAYING_COMBO3: (params, game) => {
+    [TurnStates.PLAYING_COMBO3]: (params, game) => {
         const action = params.action
         if (action == "clicked-player") {
             // save this player as the target player
             // todo check target player is alive and has cards?
             game.targetPlayerId = params.targetPlayerId
-            return "COMBO3_NOMINATING"
+            return TurnStates.COMBO3_NOMINATING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO3_ODD")
+            return doNope(params, game, TurnStates.NOPE_COMBO3_ODD)
         }
     },
-    PLAYING_COMBO5: (params, game) => {
+    [TurnStates.PLAYING_COMBO5]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "COMBO5_RECLAIMING"
+            return TurnStates.COMBO5_RECLAIMING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO5_ODD")
+            return doNope(params, game, TurnStates.NOPE_COMBO5_ODD)
         }
     },
     
-    SEE_FUTURE: (params, game) => {
+    [TurnStates.SEE_FUTURE]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         }
     },
-    COMBO2_STEALING: (params, game) => {
+    [TurnStates.COMBO2_STEALING]: (params, game) => {
         const action = params.action
         if (action == "clicked-card") {
             // remove clicked card from target player's hand, put into current player's hand
@@ -245,10 +285,10 @@ export const TurnStates = {
             const player = game.players.find(p => p.playerId == params.playerId)
             const card = game.hands[target.handIndex].splice(params.targetCardIndex, 1)[0]
             game.hands[player.handIndex].push(card)
-            return "START"
+            return TurnStates.START
         }
     },
-    COMBO3_NOMINATING: (params, game) => {
+    [TurnStates.COMBO3_NOMINATING]: (params, game) => {
         const action = params.action
         if (action == "clicked-card") {
             // clicked a card type in the "which card to nominate" popup
@@ -260,10 +300,10 @@ export const TurnStates = {
                 const card = game.hands[target.handIndex].splice(cardIndex, 1)[0]
                 game.hands[player.handIndex].push(card)
             }
-            return "START"
+            return TurnStates.START
         }
     },
-    COMBO5_RECLAIMING: (params, game) => {
+    [TurnStates.COMBO5_RECLAIMING]: (params, game) => {
         const action = params.action
         if (action == "clicked-card") {
             const player = game.players.find(p => p.playerId == params.playerId)
@@ -273,10 +313,10 @@ export const TurnStates = {
             }
             game.discard.splice(params.targetCardIndex, 1)
             game.hands[player.handIndex].push(card)
-            return "START"
+            return TurnStates.START
         }
     },
-    FAVOUR_RECEIVING: (params, game) => {
+    [TurnStates.FAVOUR_RECEIVING]: (params, game) => {
         const action = params.action
         console.log("Favour-receiginhg ", params)
         if (action == "clicked-card") {
@@ -288,39 +328,39 @@ export const TurnStates = {
             }
             const card = hand.splice(params.targetCardIndex, 1)[0]
             game.hands[player.handIndex].push(card)
-            return "START"
+            return TurnStates.START
         }
     },
-    SHUFFLING: (params, game) => {
+    [TurnStates.SHUFFLING]: (params, game) => {
         const action = params.action
         if (action == "immediate") {
             game.remainder = shuffle(game.remainder)
-            return "START"
+            return TurnStates.START
         }
     },
-    ATTACKING: (params, game) => {
+    [TurnStates.ATTACKING]: (params, game) => {
         const action = params.action
         if (action == "immediate") {
             // attack happened
             const index = getNextAlivePlayerIndex(game)
             game.attackedId = game.players[index].playerId
-            return "END"
+            return TurnStates.END
         }
     },    
-    DEFUSING: (params, game) => {
+    [TurnStates.DEFUSING]: (params, game) => {
         const action = params.action
         if (action == "timer") {
             // MUST push a bomb - if player times out, insert randomly
             const pos = Math.floor(Math.random() * game.remainder.length)
             console.log(`Reinserted bomb at ${pos}`)
             game.remainder.splice(pos, 0, Cards.BOMB)
-            return "END"
+            return TurnStates.END
         } else if (action == "submit-slider") {
             game.remainder.splice(params.insertPos, 0, Cards.BOMB)
-            return "END"
+            return TurnStates.END
         }
     },
-    END: (params, game) => {
+    [TurnStates.END]: (params, game) => {
         const action = params.action
         if (action == "immediate") {
             if (game.players[game.playerTurn].playerId == game.attackedId) {
@@ -329,143 +369,142 @@ export const TurnStates = {
             } else {
                 game.playerTurn = getNextAlivePlayerIndex(game)
             }
-            return "START"
+            return TurnStates.START
         }
     },
 
-    NOPE_FUTURE_ODD: (params, game) => {  // todo why doesnt multiple nopes work for future?
+    [TurnStates.NOPE_FUTURE_ODD]: (params, game) => {  // todo why doesnt multiple nopes work for future?
         const action = params.action
         if (action == "timer") {
             // nope succeeded
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FUTURE_EVEN")
+            return doNope(params, game, TurnStates.NOPE_FUTURE_EVEN)
         }
     },
-    NOPE_FUTURE_EVEN: (params, game) => {
+    [TurnStates.NOPE_FUTURE_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
             // nope was cancelled
-            return "SEE_FUTURE"
+            return TurnStates.SEE_FUTURE
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FUTURE_ODD")
+            return doNope(params, game, TurnStates.NOPE_FUTURE_ODD)
         }
     },
-    NOPE_SKIP_ODD: (params, game) => {
+    [TurnStates.NOPE_SKIP_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
             // nope succeeded
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
             // nope was noped
-            return doNope(params, game, "NOPE_SKIP_EVEN")
+            return doNope(params, game, TurnStates.NOPE_SKIP_EVEN)
         }
     },
-    NOPE_SKIP_EVEN: (params, game) => {
+    [TurnStates.NOPE_SKIP_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
             // nope was cancelled
-            return "END"
+            return TurnStates.END
         } else if (action == "nope") {
             // cancelled nope was re-noped
-            return doNope(params, game, "NOPE_SKIP_ODD")
+            return doNope(params, game, TurnStates.NOPE_SKIP_ODD)
         }
     },
-    NOPE_COMBO2_ODD: (params, game) => {
+    [TurnStates.NOPE_COMBO2_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO2_EVEN")
+            return doNope(params, game, TurnStates.NOPE_COMBO2_EVEN)
         }
     },
-    NOPE_COMBO2_EVEN: (params, game) => {
+    [TurnStates.NOPE_COMBO2_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "COMBO2_STEALING"
+            return TurnStates.COMBO2_STEALING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO2_ODD")
+            return doNope(params, game, TurnStates.NOPE_COMBO2_ODD)
         }
     },
-    NOPE_COMBO3_ODD: (params, game) => {
+    [TurnStates.NOPE_COMBO3_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO3_EVEN")
+            return doNope(params, game, TurnStates.NOPE_COMBO3_EVEN)
         }
     },
-    NOPE_COMBO3_EVEN: (params, game) => {
+    [TurnStates.NOPE_COMBO3_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "COMBO3_NOMINATING"
+            return TurnStates.COMBO3_NOMINATING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO3_ODD")
+            return doNope(params, game, TurnStates.NOPE_COMBO3_ODD)
         }
     },
-    NOPE_COMBO5_ODD: (params, game) => {
+    [TurnStates.NOPE_COMBO5_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO5_EVEN")
+            return doNope(params, game, TurnStates.NOPE_COMBO5_EVEN)
         }
     },
-    NOPE_COMBO5_EVEN: (params, game) => {
+    [TurnStates.NOPE_COMBO5_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "COMBO5_RECLAIMING"
+            return TurnStates.COMBO5_RECLAIMING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_COMBO5_ODD")
+            return doNope(params, game, TurnStates.NOPE_COMBO5_ODD)
         }
     },
-
-    NOPE_SHUFFLE_ODD: (params, game) => {
+    [TurnStates.NOPE_SHUFFLE_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_SHUFFLE_EVEN")
+            return doNope(params, game, TurnStates.NOPE_SHUFFLE_EVEN)
         }
     },
-    NOPE_SHUFFLE_EVEN: (params, game) => {
+    [TurnStates.NOPE_SHUFFLE_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "SHUFFLING"
+            return TurnStates.SHUFFLING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_SHUFFLE_ODD")
+            return doNope(params, game, TurnStates.NOPE_SHUFFLE_ODD)
         }
     },
-    NOPE_ATTACK_ODD: (params, game) => {
+    [TurnStates.NOPE_ATTACK_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_ATTACK_EVEN")
+            return doNope(params, game, TurnStates.NOPE_ATTACK_EVEN)
         }
     },
-    NOPE_ATTACK_EVEN: (params, game) => {
+    [TurnStates.NOPE_ATTACK_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "ATTACKING"
+            return TurnStates.ATTACKING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_ATTACK_ODD")
+            return doNope(params, game, TurnStates.NOPE_ATTACK_ODD)
         }
     },
-    NOPE_FAVOUR_ODD: (params, game) => {
+    [TurnStates.NOPE_FAVOUR_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "FAVOUR_RECEIVING"
+            return TurnStates.FAVOUR_RECEIVING
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FAVOUR_EVEN")
+            return doNope(params, game, TurnStates.NOPE_FAVOUR_EVEN)
         }
     },
-    NOPE_FAVOUR_EVEN: (params, game) => {
+    [TurnStates.NOPE_FAVOUR_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return "START"
+            return TurnStates.START
         } else if (action == "nope") {
-            return doNope(params, game, "NOPE_FAVOUR_ODD")
+            return doNope(params, game, TurnStates.NOPE_FAVOUR_ODD)
         }
     },
 }

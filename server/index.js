@@ -3,9 +3,8 @@
 /**/
 
 import express from "express"
-import Cards from "./cards.js"
 import { dealCards } from "./deck.js"
-import { TurnStates } from "./turn.js"
+import { TurnStateHandlers } from "./turn.js"
 
 const app = express()
 app.use(express.json())
@@ -140,7 +139,7 @@ app.get("/leave", (req, res) => {
 const onMatchAction = (params, game) => {
     try {
         console.log("Match action: ", params, " | ", game.turnState)
-        const newState = TurnStates[game.turnState](params, game)
+        const newState = TurnStateHandlers[game.turnState](params, game)
         if (newState === undefined) {
             return false
         }
