@@ -57,7 +57,7 @@ export default class Draggable {
         this.selectedCardsIndices.sort((a, b) => a - b)
 
         const cardsRem = [...Array(this.playState.hand.length).keys()].filter(j => !this.selectedCardsIndices.includes(j))
-        const refEl = cardsRem.length ? $(`${this.cardContId}${cardsRem[0]}`) : null
+        const refEl = $(`${this.cardContId}${cardsRem.length ? cardsRem[0] : 0}`)
         const squish = this.getSquish(refEl.offsetWidth)
 
         this.dragee = document.body.appendChild(document.createElement('div'))

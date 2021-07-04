@@ -45,7 +45,7 @@ const seeFutureModal = (state) => {
     <div id="seeFutureInModal">
         ${cards.reduce((v, c, i) => v + `
         <div id="seeFutureCardCont">
-            <div class="fuCardB fuCard${getShortCardName(c.name)}">${getCardInnerHtml(c)}</div>
+            <div class="fuCardB fuCard${getShortCardName(c)}">${getCardInnerHtml(c)}</div>
             <div>${['top', '2nd', '3rd'][i]} card</div>
         </div>
         `, "")}
@@ -69,7 +69,7 @@ const combo3NominatingModal = () => {
     <div id="combo3AllOptions">
         ${[half1, half2].reduce((u, h) => u + `
             <div class="combo3OptionsRow">
-                ${h.reduce((v, c) => v + `<div class="fuCardB enabled fuCard${getShortCardName(c.name)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
+                ${h.reduce((v, c) => v + `<div class="fuCardB enabled fuCard${getShortCardName(c)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
             </div>
         `, "")}
     </div>
@@ -79,7 +79,7 @@ const combo3NominatingModal = () => {
 const combo5ReclaimingModal = (state) => {
     return `
     <div id="combo5DiscardPile">
-        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCardB fuCard${getShortCardName(c.name)} ${c.name !== Cards.BOMB.name ? 'enabled': ''}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
+        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCardB fuCard${getShortCardName(c)} ${c.name !== Cards.BOMB.name ? 'enabled': ''}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
     </div>
     `
 }

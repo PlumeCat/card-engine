@@ -9,7 +9,8 @@ body {
     width: 100vw;
     height: 100vh;
     font-family: Tahoma, sans-serif;
-    overflow: hidden;  /* todo ...okay? */
+    overflow: hidden;
+    user-select: none;
 }
 
 button {
@@ -179,7 +180,7 @@ button[disabled] {
     box-shadow: 0 0 5px 3px orange;
 }
 .fuCardSelected, .fuCardSelected:hover {
-    box-shadow: 0 0 5px 3px orangered;
+    box-shadow: 0 0 8px 7px orangered;
     cursor: grab;
 }
 .fuCardInner {
@@ -280,7 +281,7 @@ button[disabled] {
     animation: 1s infinite pulseHover;
 }
 @keyframes pulseHover {
-    0%, 100% {box-shadow: 0 0 5px 3px orange}
+    0%, 100% {box-shadow: 0 0 7px 5px orange}
 }
 
 #combo2OppHand .fdCard {

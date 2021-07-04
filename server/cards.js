@@ -38,9 +38,9 @@ const shortCardNames = {
     "BOMB": "BOM",
 }
 
-export const getShortCardName = cardName => shortCardNames[cardName] //.split('_').pop().substr(0, 3)
+export const getShortCardName = card => shortCardNames[card.name]
 
-export const getCardInnerHtml = c => `<div class="fuCardInner">${c.displayName || c.name.replace('_', ' ')}</div>`
+export const getCardInnerHtml = card => `<div class="fuCardInner">${card.displayName || card.name.replace('_', ' ')}</div>`
 
 export default cardNames.reduce((obj, entry, index) => {
     obj[entry] = {

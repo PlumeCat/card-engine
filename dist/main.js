@@ -259,7 +259,7 @@ class MatchScreen extends GameScreen {
         `, `
             <div class="matchCardPileCont" id="matchDiscardPile">
                 ${game.discard.length ? `
-                    <div class="fuCardB fuCard${getShortCardName(game.discard[0].name)}" id="matchDiscardPileTopCard">${getCardInnerHtml(game.discard[0])}</div>
+                    <div class="fuCardB fuCard${getShortCardName(game.discard[0])}" id="matchDiscardPileTopCard">${getCardInnerHtml(game.discard[0])}</div>
                 ` : `
                     <div class="fuCardB invis"><div class="fuCardInner"></div></div>
                 `}
@@ -275,7 +275,10 @@ class MatchScreen extends GameScreen {
             </div>
         `, `
             <div class="matchCardPileCont" id="matchRemPile">
-                <div class="fduCard fuCardB${this.validToPickCard() ? ' enabled' : ''}" id="matchRemPileTopCard"><div class="fuCardInner">${remainderCount}</div></div>
+            ${this.playState.turnState === TurnStates.DEFUSING ? 
+                `<div class="fuCardB fuCard${getShortCardName(Cards.BOMB)}">${getCardInnerHtml(Cards.BOMB)}</div>` :
+                `<div class="fduCard fuCardB${this.validToPickCard() ? ' enabled' : ''}" id="matchRemPileTopCard"><div class="fuCardInner">${remainderCount}</div></div>`
+            }
             </div>
         `]
         const actions = [`
@@ -313,7 +316,7 @@ class MatchScreen extends GameScreen {
     renderCard(c, i) {
         return `
         <div id="hand-card-cont-${i}">
-            <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c.name)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
+            <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
                 ${getCardInnerHtml(c)}
             </div>
         </div>`
