@@ -7,7 +7,7 @@ import Cards from "/cards.js"
 
 const getShortCardName = cardName => cardName.split('_').pop().substr(0, 3)
 
-const getCardInnerHtml = c => `<div class="fuCardInner"> ${c.displayName || c.name.replace('_', ' ')}</div>`
+const getCardInnerHtml = c => `<div class="fuCardInner">${c.displayName || c.name.replace('_', ' ')}</div>`
 
 
 const MatchState = {
@@ -50,8 +50,14 @@ const getTurnStateMsg = (state) => {
 
     const turnState = state.turnState
 
-    if (ChooseOppTurnStates.includes(turnState)) {
-        return isPlayer ? 'choose a player' : ''
+    if (turnState.startsWith('NOPE_')) {
+        const noper = `<b>${state.game.players.find(p => p.playerId === state.game.noperId).playerName}</b>`
+        return `${state.prevTurnStateMsg}. "NOPE${'!'.repeat(state.prevTurnStateMsg.split('NOPE!').length)}" - ${noper}.`
+    }
+    if (turnState.startsWith('PLAYING_')) {
+        const chooseOpp = ChooseOppTurnStates.includes(turnState)
+        return isPlayer && chooseOpp ? 'choose a player'
+            : `${currentPlayer} is playing "${turnState.replace('PLAYING_', '').split('_').join(' ')}"${chooseOpp ? ', and choosing a player...' : ''}`
     }
     if (turnState === TS_FAVOUR_RECEIVING) {
         return isPlayer ? `waiting for card from ${targetPlayer}`
@@ -63,7 +69,7 @@ const getTurnStateMsg = (state) => {
              : isTarget ? `${bold('your')} cards are fanned out for ${currentPlayer} to grab one!`
              : `${currentPlayer} is picking a card from ${targetPlayer}'s hand`
     }
-    if (turnState === TS_COMBO3_NOMINATING) {
+    if (turnState === TS_COMBO3_NOMINATING) {  // todo need msg for what was nominated and whether target player had the card
         return isPlayer ? `nominate a card to request from ${targetPlayer}`
              : isTarget ? `${currentPlayer} is nominating a card to request from ${bold('you')}`
              : `${currentPlayer} is nominating a card to request from ${targetPlayer}`
@@ -73,7 +79,7 @@ const getTurnStateMsg = (state) => {
              : `${currentPlayer} is reclaiming a card from the discard pile...`
     }
     if (turnState === TS_DEFUSING) {
-        return isPlayer ? 'unlucky'
+        return isPlayer ? 'pick a position to reinsert the bomb...'
              : `${currentPlayer} picked a bomb! defusing...`
     }
     return ''
@@ -83,6 +89,8 @@ const getTurnStateMsg = (state) => {
 // helper functions
 const API_PATH = "//localhost:3000"
 const $ = id => document.getElementById(id)
+const $$ = selector => document.querySelector(selector)  // todo maybe rename these... perhaps actually have a querySelectorAll which uses "$"
+const $$$ = selector => document.querySelectorAll(selector)  // todo this is getting ridiculous
 const makeParams = (params) => (params ? Object.entries(params).reduce((value, entry, i) => value + `${i ? "&" : ""}${encodeURIComponent(entry[0])}=${encodeURIComponent(entry[1])}`, "?") : "")
 const api = (method, path, params, headers, body) => fetch(API_PATH + path + makeParams(params), {
         method: method,
@@ -132,17 +140,18 @@ class PlayState {
             matchState: MatchState.WAITING,
             players: [],
             hands: [],
+            attackedId: null,
             winner: ""
         }
     }
     get player() {
-        return this.game.players.find(p => p.playerId === this.playerId)
+        return this.getPlayer(this.playerId)
     }
     get currentPlayer() {
         return this.game.players[this.game.playerTurn]
     }
     get targetPlayer() {
-        return this.game.players.find(p => p.playerId === this.game.targetPlayerId)
+        return this.getPlayer(this.game.targetPlayerId)
     }
     get hand() {
         return this.game.hands[this.player.handIndex] || []
@@ -155,13 +164,32 @@ class PlayState {
         apiGet("/state", { gameId: this.gameId })
             .then(newState => {
                 if (newState && !compareState(this.game, newState)) {
+                    if (newState.turnState !== this.turnState && this.game.matchState === MatchState.PLAYING) {
+                        this.prevTurnStateMsg = getTurnStateMsg(this)
+                    }
+                    this.handleAttackTurn(newState)
                     this.game = newState
                     render()
                 }
             }).catch(console.error)
     }
+    handleAttackTurn(newState) {
+        if (newState.attackedId !== this.game.attackedId) {
+            this.attackedTurn = newState.attackedId !== null ? 1 : 2
+        }
+        else if (newState.attackedId === null) {
+            this.attackedTurn = null
+        }
+    }
     isYourTurn() {
         return this.currentPlayer.playerId === this.playerId
+    }
+    getPlayer(player) {
+        // player == player or playerId
+        if (player && player.hasOwnProperty('playerId')) {
+            return player
+        }
+        return this.game.players.find(p => p.playerId === player)
     }
     getNthPlayer(n) {
         return this.game.players[(this.game.players.findIndex(p => p.playerId === this.playerId) + n) % 4]
@@ -174,6 +202,15 @@ class PlayState {
     }
     chooseOppEnabled() {
         return this.isYourTurn() && ChooseOppTurnStates.includes(this.turnState)
+    }
+    playerAvailable(player) {
+        return this.playerAlive(player) && this.playerCardCount(player)
+    }
+    playerAlive(player) {
+        return this.getPlayer(player).alive
+    }
+    playerCardCount(player) {
+        return this.game.hands[this.getPlayer(player).handIndex].length   // this will eventually just come from the server (wont send details of other players hands)
     }
     apiParams() {
         return {
@@ -236,6 +273,8 @@ class MatchScreen extends GameScreen {
         this.timeout = 500
         this.renderNodeId = 'matchFloor'
         this.selectedCardsIndices = []  // todo ensure to reset this when necessary
+        this.debugPiles = false
+        this.draggable = new Draggable(this)
     }
     get matchState() {
         return this.playState.game.matchState
@@ -268,24 +307,8 @@ class MatchScreen extends GameScreen {
                 <div id="matchPlayBottom">
                     <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
                     <div id="matchPlayArea">
-                        <div id="matchStacks">
-                            <div class="matchCardStackCont" id="matchDiscardStack">
-                                <span>Discard</span>
-                                <hr>
-                                <div class="matchCardStack">
-                                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                </div>
-                            </div>
-                            <div class="matchCardStackCont" id="matchRemStack">
-                                <span>Deck</span>
-                                <hr>
-                                <div class="matchCardStack">
-                                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
-                                </div>
-                            </div>
-                            <div id="matchPlayAreaActions">
-                                <button id="pick-button">pick</button>
-                            </div>
+                        <div id="matchPilesCont">
+                            ${this.renderMatchPiles(game)}
                         </div>
                         ${this.renderPlayInfo()}
                     </div>
@@ -295,36 +318,77 @@ class MatchScreen extends GameScreen {
             <div id='playerSection'>
                 <div id='playerHandCont'>
                     <div class="playerHandAligner"></div>
-                    <div id='playerHand'>
+                    <div id='playerHand' class="dropZone">
                         ${this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
                     </div>
-                    <div id="playerHandActionsCont">
-                        <div id="playerHandActions">
-                            <button id="play-button">play</button>
-                            <button id="nope-button">nope</button>
-                            ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
-                        </div>
+                    <div class="playerHandAligner"></div>
+                </div>
+                <div id="playerHandActionsCont">
+                    <div id="playerHandActions">
+                        <button id="play-button">play</button>
+                        <button id="nope-button">nope</button>
+                        ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
                     </div>
                     <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
+                    <div id="debugCont">
+                        <input type="checkbox" id="debugPilesCheck" ${this.debugPiles ? 'checked' : ''}><label for="debugPilesCheck">debug</label>
+                    </div>
                 </div>
             </div>
             ${this.playState.showModal() ? modal(this.playState) : ''}
         `
     }
-    renderCard(c, i) {
+    renderMatchPiles(game) {
+        const remainderCount = game.remainder.length <= 10 ? game.remainder.length
+                             : game.remainder.length < 15 ? '10+'
+                             : game.remainder.length < 20 ? '15+'
+                             : '?'
+        const discard = [`
+            <div class="matchCardStackCont" id="matchDiscardStack">
+                <span>Discard</span>
+                <hr>
+                <div class="matchCardStack">
+                    ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                </div>
+            </div>
+        `, `
+            <div class="matchCardPileCont" id="matchDiscardPile">
+                ${game.discard.length ? `
+                    <div class="fuCardB fuCard${getShortCardName(game.discard[0].name)}" id="matchDiscardPileTopCard">${getCardInnerHtml(game.discard[0])}</div>
+                ` : `
+                    <div class="fuCardB invis"><div class="fuCardInner"></div></div>
+                `}
+            </div>
+        `]
+        const remainder = [`
+            <div class="matchCardStackCont" id="matchRemStack">
+                <span>Deck</span>
+                <hr>
+                <div class="matchCardStack">
+                    ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
+                </div>
+            </div>
+        `, `
+            <div class="matchCardPileCont" id="matchRemPile">
+                <div class="fduCard fuCardB${this.validToPickCard() ? ' enabled' : ''}" id="matchRemPileTopCard"><div class="fuCardInner">${remainderCount}</div></div>
+            </div>
+        `]
+        const actions = [`
+            <div id="matchPlayAreaActions">
+                <button id="pick-button">pick</button>
+            </div>
+        `, '']
+
         return `
-        <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c.name)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
-            ${getCardInnerHtml(c)}
-        </div>`
-    }
-    renderOppHand(pos) {
-        const n = {left: 1, top: 2, right: 3}[pos]
-        const player = this.playState.getNthPlayer(n)
-        const len = this.playState.game.hands[player.handIndex].length  // this will eventually just come from the server (wont send details of other players hands)
-        return `
-            <div class="oppHandCont${this.playState.chooseOppEnabled() ? ' enabled' : ''}" id="oppHand-${player.playerId}">
-                <div class="fdCard fdCardOpp">${len}</div>
-                <div class="oppPlayerInfo">${player.playerName}</div>
+            <div id="matchStacks" class="${this.debugPiles ? '' : 'hidden'}">
+                ${discard[0]}
+                ${remainder[0]}
+                ${actions[0]}
+            </div>
+            <div id="matchPiles" class="${this.debugPiles ? 'hidden' : ''}">
+                ${discard[1]}
+                ${remainder[1]}
+                ${actions[1]}
             </div>
         `
     }
@@ -332,12 +396,37 @@ class MatchScreen extends GameScreen {
         return `
             <div id="playInfo">
                 <div>
-                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...
+                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
                     ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
                 </div>
                 <div>
                     ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
                 </div>
+            </div>
+        `
+    }
+    renderCard(c, i) {
+        return `
+        <div id="hand-card-cont-${i}">
+            <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c.name)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
+                ${getCardInnerHtml(c)}
+            </div>
+        </div>`
+    }
+    renderOppHand(pos) {
+        const n = {left: 1, top: 2, right: 3}[pos]
+        const player = this.playState.getNthPlayer(n)
+        const alive = this.playState.playerAlive(player)
+        const len = this.playState.playerCardCount(player)
+        const classes = [
+            'oppHandCont',
+            (this.playState.chooseOppEnabled() && this.playState.playerAvailable(player)) ? 'enabled' : '',
+            !alive ? 'dead' : '',
+        ].filter(c => c).join(' ')
+        return `
+            <div class="${classes}" id="oppHand-${player.playerId}">
+                <div class="fdCard fdCardOpp">${alive ? len : ''}</div>
+                <div class="oppPlayerInfo">${player.playerName}</div>
             </div>
         `
     }
@@ -347,6 +436,9 @@ class MatchScreen extends GameScreen {
             <div id="${this.renderNodeId}"></div>
         </div>
         `
+    }
+    validToPickCard(){
+        return true  // todo complete this later
     }
     validateCardsForPlay() {
         return true  // todo enable front end validation when ready
@@ -390,6 +482,13 @@ class MatchScreen extends GameScreen {
                     }
                     document.querySelectorAll('#playerHandActions button').forEach(b => {b.disabled = this.buttonIsDisabled(b.id)})
                 })
+                $(`hand-card-${i}`).addEventListener("mousedown", (e) => {
+                    // todo keep cards mousemove-ing if re-render
+                    if (e.button !== 0) {
+                        return
+                    }
+                    this.draggable.initiateDrag(e, i)
+                })
             }
         }
 
@@ -397,6 +496,12 @@ class MatchScreen extends GameScreen {
         document.querySelectorAll('button').forEach(b => b.disabled = this.buttonIsDisabled(b.id))
 
         $("pick-button")?.addEventListener("click", e => {
+            apiPost("/action", {
+                action: "pick",
+                ...this.playState.apiParams()
+            }).catch(alert)
+        })
+        $("matchRemPileTopCard")?.addEventListener("click", e => {  // todo change form click to draggable
             apiPost("/action", {
                 action: "pick",
                 ...this.playState.apiParams()
@@ -434,7 +539,7 @@ class MatchScreen extends GameScreen {
         // handle clicking on a player
         if (game.matchState === MatchState.PLAYING && this.playState.chooseOppEnabled()) {
             game.players.forEach(p => {
-                if (p.playerId === playerId) {
+                if (p.playerId === playerId || !this.playState.playerAvailable(p)) {
                     return
                 }
                 $(`oppHand-${p.playerId}`).addEventListener('click', () => {
@@ -462,7 +567,7 @@ class MatchScreen extends GameScreen {
         })
 
         // handle nominating a card (combo3)
-        document.querySelectorAll('#combo3AllOptions .fuCard').forEach(c => {
+        document.querySelectorAll('#combo3AllOptions .fuCardB').forEach(c => {
             const cardVal = parseInt(c.id.split('-').pop())
             c.addEventListener('click', () => {
                 console.log(`${cardVal} card nominated`)
@@ -475,7 +580,7 @@ class MatchScreen extends GameScreen {
         })
 
         // handle reclaiming a card (combo5)
-        document.querySelectorAll('#combo5DiscardPile .fuCard').forEach(c => {
+        document.querySelectorAll('#combo5DiscardPile .fuCardB').forEach(c => {
             const index = parseInt(c.id.split('-').pop())
             c.addEventListener('click', () => {
                 console.log(`${index} card clicked`)
@@ -499,6 +604,258 @@ class MatchScreen extends GameScreen {
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
             }).catch(alert)
         })
+
+        // handle reinserting a card (defusing)
+        document.querySelectorAll('#defusingRemPile .defusingRemPick').forEach(c => {
+            const index = parseInt(c.id.split('-').pop())
+            c.addEventListener('click', () => {
+                apiPost("/action", {
+                    action: "submit-slider",
+                    insertPos: index,
+                    ...this.playState.apiParams()
+                }).catch(alert)
+            })
+        })
+
+        // handle debug piles checkbox
+        $('debugPilesCheck')?.addEventListener('change', e => {
+            if (this.debugPiles !== e.target.checked) {
+                this.debugPiles = e.target.checked
+                $(this.debugPiles ? 'matchPiles': 'matchStacks').classList.add('hidden')
+                $(this.debugPiles ? 'matchStacks': 'matchPiles').classList.remove('hidden')
+            }
+        })
+    }
+}
+
+class Draggable {
+    constructor(match) {
+        this.match = match
+        this.playState = match.playState
+        this.renderNodeId = match.renderNodeId
+        this.dropZoneCls = 'dropZone'
+        this.cardContId = 'hand-card-cont-'
+        this.ghostId = `${this.cardContId}ghost`
+        this.currentDropZone = null
+        this.cardsOnLeftQty = null
+        this.activeTimer = null
+        this.dragTimeout = 500
+
+        this.dragee = null
+        this.listeners = null
+    }
+    get selectedCardsIndices() {
+        return this.match.selectedCardsIndices
+    }
+    set selectedCardsIndices(array) {
+        return this.match.selectedCardsIndices = array
+    }
+    addListeners(listeners) {
+        this.listeners = listeners
+        for (let key of Object.keys(this.listeners)) {
+            window.addEventListener(key, this.listeners[key])
+        }
+    }
+    removeListeners() {
+        for (let key of Object.keys(this.listeners)) {
+            window.removeEventListener(key, this.listeners[key])
+        }
+        this.listeners = null
+    }
+    initiateDrag(event, cardIdx) {
+        this.activeTimer = setTimeout(() => {this.handleDragSelectedCards(event, cardIdx)}, this.dragTimeout)
+        const handleMouseUp = () => {
+            clearTimeout(this.activeTimer)
+            this.activeTimer = null
+            window.removeEventListener("mouseup", handleMouseUp)
+        }
+        window.addEventListener("mouseup", handleMouseUp)
+    }
+    handleDragSelectedCards(e, cardIdx) {
+        e.preventDefault()
+
+        if (!this.selectedCardsIndices.includes(cardIdx)) {
+            this.selectedCardsIndices.push(cardIdx)
+            $(`hand-card-${cardIdx}`).classList.add('fuCardSelected')
+        }
+        this.selectedCardsIndices.sort((a, b) => a - b)
+
+        const cardsRem = [...Array(this.playState.hand.length).keys()].filter(j => !this.selectedCardsIndices.includes(j))
+        const refEl = cardsRem.length ? $(`${this.cardContId}${cardsRem[0]}`) : null
+        const squish = this.getSquish(refEl.offsetWidth)
+
+        this.dragee = document.body.appendChild(document.createElement('div'))
+        this.dragee.id = 'drag-hand-cards'
+        this.dragee.classList.add('draggable', 'flex')
+        for (let idx of this.selectedCardsIndices) {
+            this.dragee.appendChild($(`${this.cardContId}${idx}`))
+        }
+
+        this.dragee.style.top = (e.clientY - (this.dragee.offsetHeight/2)) + "px"
+        this.dragee.style.left = (e.clientX - (this.dragee.offsetWidth/2)) + "px"
+
+        $(this.renderNodeId).classList.add('dragging')
+
+        this.addListeners({
+            'mousemove': e => this.handleCardMouseMove(e, refEl, cardsRem, squish),
+            'mouseup': e => this.handleCardMouseUp(e, cardsRem),
+            'keyup': e => this.handleEscKeyUp(e),
+        })
+    }
+    getSquish(refElWidth) {
+        const handLen = this.playState.hand.length
+
+        if (refElWidth * handLen > $('playerHand').offsetWidth) {
+            const winW = window.innerWidth - (5*2)  // 2 x player hand margin 5px (beware magic number!)
+            const minMargin = 5, maxCardP = 15, maxCardW = 75  // hardcoded css values???
+            const cardW = winW / handLen
+            let minMarginCardWidth = (2*minMargin) + (2*maxCardP) + maxCardW
+            if (minMarginCardWidth * handLen < winW) {
+                const margin = Math.floor(minMargin + ((cardW - minMarginCardWidth) / 2))
+                return margin < 10 ? { margin: margin + 'px' } : {}  // 10px here being normal card margin
+            }
+            else {
+                const innerW  = Math.floor((cardW - (2*minMargin)) * maxCardW/((2*maxCardP)+maxCardW))
+                const padding = Math.floor((cardW - (2*minMargin)) * maxCardP/((2*maxCardP)+maxCardW))
+                const fontSize = 16 * innerW/maxCardW //  hardcoded css values???
+                return {
+                    width: innerW + 'px',
+                    height: Math.floor(4 * innerW / 3) + 'px',
+                    padding: padding + 'px',
+                    margin: minMargin + 'px',
+                    fontSize: fontSize + 'px',
+                }
+            }
+        }
+    }
+    applySquish(squish) {
+        $(this.renderNodeId).classList.add('squish')
+        $$$('.fuCard').forEach(c => {
+            if (squish.margin) {c.style.marginLeft = squish.margin;  c.style.marginRight = squish.margin}
+            if (Object.keys(squish).length > 1) {
+                c.style.paddingLeft = squish.padding;  c.style.paddingRight = squish.padding
+                c.firstElementChild.style.width = squish.width; c.firstElementChild.style.height = squish.height
+                c.firstElementChild.style.fontSize = squish.fontSize
+            }
+        })
+    }
+    removeSquish() {
+        $(this.renderNodeId).classList.remove('squish')
+        $$$('.fuCard').forEach(c => {
+            for (let k of ['margin-left', 'margin-right', 'padding-left', 'padding-right', 'width', 'height', 'font-size']) {
+                c.style.removeProperty(k)
+            }
+        })
+    }
+    findDropZoneUnderPoint(x, y) {
+        const dropZones = document.querySelectorAll(`.${this.dropZoneCls}`)
+        for (let i = 0; i < dropZones.length; i++) {
+            const box = dropZones[i].getBoundingClientRect()
+            if (x > box.left && x < box.right && y > box.top && y < box.bottom) {
+                return dropZones[i]
+            }
+        }
+    }
+    handleCardMouseMove(e, refEl, cardsRem, squish) {
+        e.preventDefault()
+
+        this.dragee.style.top = (e.clientY - (this.dragee.offsetHeight/2)) + "px"
+        this.dragee.style.left = (e.clientX - (this.dragee.offsetWidth/2)) + "px"
+
+        const dropZone = this.findDropZoneUnderPoint(e.clientX, e.clientY)
+
+        if (dropZone !== this.currentDropZone) {
+            if (dropZone) {
+                // -> drag enter zone
+                dropZone.classList.add('dropZoneHover')
+
+                if (dropZone.id === 'playerHand') {
+                    const ghost = document.body.appendChild(document.createElement('div'))
+                    ghost.classList.add('flex')
+                    ghost.id = this.ghostId
+                    ghost.innerHTML = `<div class="fuCard"><div class="fuCardInner"></div></div>`.repeat(this.selectedCardsIndices.length)
+                    if (squish) { this.applySquish(squish) }
+                }
+            }
+            if (this.currentDropZone) {
+                // -> drag leave zone
+                this.currentDropZone.classList.remove('dropZoneHover')
+
+                if (this.currentDropZone.id === 'playerHand') {
+                    $(this.ghostId).remove()
+                    this.cardsOnLeftQty = null
+                    if (squish) { this.removeSquish() }
+                }
+            }
+            this.currentDropZone = dropZone
+        }
+
+        if (dropZone && dropZone.id === 'playerHand') {
+            this.handleCardMouseMoveGhost(e, refEl, cardsRem, dropZone)
+        }
+    }
+    handleCardMouseMoveGhost(e, refEl, cardsRem, dropZone) {
+        if (!cardsRem.length) {
+            if (!dropZone.children.length) {
+                dropZone.appendChild($(this.ghostId))
+            }
+            return
+        }
+        const relMouseX = e.clientX - dropZone.offsetLeft
+        const cardWidth = refEl.offsetWidth  // assumes all cards are same dimensions
+        const cardsOnLeftQty = Math.floor((relMouseX + (cardWidth/2) - (cardWidth * this.selectedCardsIndices.length * 0.5)) / cardWidth)
+        if (cardsOnLeftQty === this.cardsOnLeftQty) {
+            return
+        }
+        this.cardsOnLeftQty = cardsOnLeftQty
+        const cardAfter = (this.cardsOnLeftQty >= cardsRem.length) ? null : $(`${this.cardContId}${cardsRem[this.cardsOnLeftQty]}`)
+
+        dropZone.insertBefore($(this.ghostId), cardAfter)
+    }
+    handleCardMouseUp(e, cardsRem) {
+        if (this.currentDropZone && (this.currentDropZone.id === 'playerHand' && $(this.ghostId))) {
+            // drag completed on player hand drop zone
+            $(this.ghostId).replaceWith(...this.dragee.children)
+            cardsRem.splice(this.cardsOnLeftQty, 0, ...this.selectedCardsIndices)
+
+            if (!cardsRem.every((c, i) => !i || c > cardsRem[i-1])) {
+                // card order has changed (is no longer ascending)
+                const newSelection = this.selectedCardsIndices.map((_, i) => this.cardsOnLeftQty + i)
+                console.log("UPDATE HAND", cardsRem)
+                apiPost("/action", {
+                    action: "update-hand",
+                    updatedHandIndices: cardsRem,
+                    ...this.playState.apiParams()
+                }).then(() => {
+                    this.selectedCardsIndices = newSelection
+                }).catch(console.error)
+            }
+        }
+        else {
+            // drag cancelled
+            this.cancelDragSelectedCards()
+        }
+        this.endDrag()
+    }
+    endDrag() {
+        this.dragee.remove()
+        this.currentDropZone?.classList.remove('dropZoneHover')
+        this.currentDropZone = null
+        this.cardsOnLeftQty = null
+        $(this.renderNodeId).classList.remove('dragging', 'squish')
+        this.removeListeners()
+    }
+    cancelDragSelectedCards() {
+        $(this.ghostId)?.remove()  // todo this bug would have been caught earlier if there was a mechanism to auto handle creation and deletion of nodes/classes/props etc
+        for (let i of [...this.selectedCardsIndices].reverse()) {
+            $('playerHand').insertBefore($(`${this.cardContId}${i}`), $$(`#playerHand #${this.cardContId}${i + 1}`) || null)
+        }
+    }
+    handleEscKeyUp(e) {
+        if (e.key === 'Escape') {
+            this.cancelDragSelectedCards()
+            this.endDrag()
+        }
     }
 }
 
@@ -623,13 +980,13 @@ const modalContent = (state) => {
         return combo5ReclaimingModal(state)
     }
     if (state.turnState === TS_DEFUSING) {
-        return `defusing bomb...`
+        return defusingModal(state)
     }
     return ''
 }
 
 const combo2StealingModal = (state) => {
-    const len = state.game.hands[state.targetPlayer.handIndex].length  // todo this comes from server eventually
+    const len = state.playerCardCount(state.targetPlayer)
     return `
     <div id="combo2OppHand">
     ${Array.from({length: len}, (_, i) => `<div class="fdCard" id="combo2pick-${i}"></div>`).join('')}
@@ -645,7 +1002,7 @@ const combo3NominatingModal = () => {
     <div id="combo3AllOptions">
         ${[half1, half2].reduce((u, h) => u + `
             <div class="combo3OptionsRow">
-                ${h.reduce((v, c) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
+                ${h.reduce((v, c) => v + `<div class="fuCardB enabled fuCard${getShortCardName(c.name)}" id="fuCard-${c.value}">${getCardInnerHtml(c)}</div>`, "")}
             </div>
         `, "")}
     </div>
@@ -655,7 +1012,17 @@ const combo3NominatingModal = () => {
 const combo5ReclaimingModal = (state) => {
     return `
     <div id="combo5DiscardPile">
-        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCard fuCard${getShortCardName(c.name)}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
+        ${state.game.discard.reduce((v, c, i) => v + `<div class="fuCardB fuCard${getShortCardName(c.name)} ${c.name !== Cards.BOMB.name ? 'enabled': ''}" id="fuCard-${i}">${getCardInnerHtml(c)}</div>`, "")}
+    </div>
+    `
+}
+
+const defusingModal = (state) => {
+    const len = state.game.remainder.length  // todo this comes from server eventually ?
+    return `
+    <div id="defusingRemPile">
+        ${Array.from({length: len}, (_, i) => `<div class="defusingRemPick" id="defusingRemPick-${i}">${i ? `${i}` : 'top'}</div><div class="fdCard"></div>`).join('')}
+        <div class="defusingRemPick" id="defusingRemPick-${len}">bottom</div>
     </div>
     `
 }

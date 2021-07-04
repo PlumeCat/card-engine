@@ -189,7 +189,15 @@ app.post("/action", (req, res) => {
     }
     
     if (game.matchState == MatchState.PLAYING) {
-        if (onMatchAction(req.body, game)) {
+        if (action === 'update-hand') {  // todo actually feels like the wrong place to put this now...
+            if (!req.body.updatedHandIndices || req.body.updatedHandIndices.length !== game.hands[player.handIndex].length) {
+                // todo additional validation like the values are all unique and correct indices
+                return res.status(400).send({ message: "something went wrong" })
+            }
+            game.hands[player.handIndex] = req.body.updatedHandIndices.map(i => game.hands[player.handIndex][i])
+            return res.status(200).send({ message: "ok" })
+        }
+        else if (onMatchAction(req.body, game)) {
             return res.status(200).send({ message: "ok" })
         }
         return res.status(400).send({ message: "illegal action" })
