@@ -2,6 +2,7 @@
 
 import { $, $$, $$$ } from "/dollar.js"
 import { apiPost } from "/api_client.js"
+import Cards from "/cards.js"
 
 
 export default class Draggable {
@@ -12,6 +13,7 @@ export default class Draggable {
         this.dropZoneCls = 'dropZone'
         this.cardContId = 'hand-card-cont-'
         this.ghostId = `${this.cardContId}ghost`
+        this.currentPlayerNode = null
         this.currentDropZone = null
         this.cardsOnLeftQty = null
         this.activeTimer = null
@@ -71,6 +73,16 @@ export default class Draggable {
         this.dragee.style.left = (e.clientX - (this.dragee.offsetWidth/2)) + "px"
 
         $(this.renderNodeId).classList.add('dragging')
+        if (this.playState.isGivingFavour()) {
+            if (this.selectedCardsIndices.length === 1) {
+                this.currentPlayerNode = $(`oppHand-${this.playState.currentPlayer.playerId}`)
+                this.currentPlayerNode.classList.add('dropZone')
+                this.currentPlayerNode.style.padding = '40px'
+            }
+        }
+        else {
+            $('matchDiscardPile').classList.add('dropZone')  // todo more validation for this!
+        }
 
         this.addListeners({
             'mousemove': e => this.handleCardMouseMove(e, refEl, cardsRem, squish),
@@ -204,8 +216,46 @@ export default class Draggable {
                     ...this.playState.apiParams()
                 }).then(() => {
                     this.selectedCardsIndices = newSelection
-                }).catch(console.error)
+                }).catch(err => {
+                    alert(`error while arranging cards: ${err}`)  // todo need to handle this properly. revert back to previous hand order. force rerender for now
+                    this.playState.forceRerender()
+                })
             }
+        }
+        else if (this.currentDropZone && (this.currentDropZone.id === 'matchDiscardPile')) {
+            console.log("PLAY (draggable)")
+            const oldCards = $('matchDiscardPile').innerHTML
+            const cards = this.selectedCardsIndices.map(i => this.playState.hand[i])
+            $('matchDiscardPile').innerHTML = this.match.renderDiscardPileTop(cards)
+            apiPost("/action", {
+                action: "play",
+                cardIndices: this.selectedCardsIndices,
+                ...this.playState.apiParams()
+            }).then(() => {
+                this.selectedCardsIndices = []
+                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+            }).catch(err => {
+                alert(err)
+                $('matchDiscardPile').innerHTML = oldCards
+                // this.cancelDragSelectedCards()  // todo this doesnt work, because dragee is already removed :(
+                // forcing a re-render, until the cancelDrag thing can work... unless a force rerender is actually fine?
+                this.playState.forceRerender()
+            })
+        }
+        else if (this.currentDropZone && (this.currentDropZone === this.currentPlayerNode)) {
+            console.log("GIVE")
+            apiPost("/action", {
+                action: "clicked-card",
+                targetCardIndex: this.selectedCardsIndices[0],
+                ...this.playState.apiParams()
+            }).then(() => {
+                this.selectedCardsIndices = []
+                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+            }).catch(err => {
+                alert(err)
+                // this.cancelDragSelectedCards()
+                this.playState.forceRerender()
+            })
         }
         else {
             // drag cancelled
@@ -219,6 +269,10 @@ export default class Draggable {
         this.currentDropZone = null
         this.cardsOnLeftQty = null
         $(this.renderNodeId).classList.remove('dragging', 'squish')
+        $('matchDiscardPile').classList.remove('dropZone')
+        this.currentPlayerNode?.classList.remove('dropZone')  // todo some of these are way too specific for this general 'endDrag'
+        this.currentPlayerNode?.style.removeProperty('padding')
+        this.currentPlayerNode = null
         this.removeListeners()
     }
     cancelDragSelectedCards() {

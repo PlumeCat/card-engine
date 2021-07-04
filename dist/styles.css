@@ -154,6 +154,10 @@ button[disabled] {
     flex-direction: column;
     padding: 10px;
 }
+#playerHandActionsAligner {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
 #playerHandActions {
     display: flex;
     flex-direction: column;
@@ -247,6 +251,7 @@ button[disabled] {
 #matchPlayersTop {
     display: flex;
     justify-content: center;
+    padding: 5px;
 }
 #matchPlayersRight {
     display: flex;
@@ -356,6 +361,9 @@ button[disabled] {
 .matchCardStack {
     height: 150px;
     overflow-y: auto;
+}
+#matchDiscardPile {
+    border-radius: 5px;
 }
 
 #matchDiscardStack {

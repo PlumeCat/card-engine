@@ -123,6 +123,10 @@ class PlayState {
             playerId: this.playerId,
         }
     }
+    forceRerender() {
+        // temp hack
+        render()
+    }
 }
 
 
@@ -229,18 +233,25 @@ class MatchScreen extends GameScreen {
                     <div class="playerHandAligner"></div>
                 </div>
                 <div id="playerHandActionsCont">
-                    <div id="playerHandActions">
+                    <div id="playerHandActionsAligner"></div>
+                    <div class="hidden" id="playerHandActions">
                         <button id="play-button">play</button>
                         <button id="nope-button">nope</button>
                         ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
                     </div>
-                    <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
-                    <div id="debugCont">
+                    <div class="hidden" id="debugCont">
                         <input type="checkbox" id="debugPilesCheck" ${this.debugPiles ? 'checked' : ''}><label for="debugPilesCheck">debug</label>
                     </div>
+                    <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                 </div>
             </div>
             ${this.playState.showModal() ? renderModal(this.playState) : ''}
+        `
+    }
+    renderDiscardPileTop(cards) {
+        const card = [...cards].pop()
+        return `
+        <div class="fuCardB fuCard${getShortCardName(card)}" id="matchDiscardPileTopCard">${getCardInnerHtml(card)}</div>
         `
     }
     renderMatchPiles(game) {
@@ -258,9 +269,9 @@ class MatchScreen extends GameScreen {
             </div>
         `, `
             <div class="matchCardPileCont" id="matchDiscardPile">
-                ${game.discard.length ? `
-                    <div class="fuCardB fuCard${getShortCardName(game.discard[0])}" id="matchDiscardPileTopCard">${getCardInnerHtml(game.discard[0])}</div>
-                ` : `
+                ${game.discard.length ? 
+                    this.renderDiscardPileTop([game.discard[0]])
+                  : `
                     <div class="fuCardB invis"><div class="fuCardInner"></div></div>
                 `}
             </div>
@@ -535,6 +546,7 @@ class MatchScreen extends GameScreen {
                 this.debugPiles = e.target.checked
                 $(this.debugPiles ? 'matchPiles': 'matchStacks').classList.add('hidden')
                 $(this.debugPiles ? 'matchStacks': 'matchPiles').classList.remove('hidden')
+                $('playerHandActions').classList[this.debugPiles ? 'remove' : 'add']('hidden')
             }
         })
     }

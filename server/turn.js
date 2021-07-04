@@ -36,6 +36,13 @@ const isCatCard = card => [
     Cards.CAT_POTATO
 ].includes(card)
 
+export const checkNope = (params, game) => {
+    return params.action === "nope" || (
+           params.action === "play"
+        && params.cardIndices.length === 1
+        && game.hands[game.players.find(p => p.playerId === params.playerId).handIndex][params.cardIndices[0]] === Cards.NOPE
+    )
+}
 
 const doNope = (params, game, successState) => {
     // nope can come from any player!
@@ -45,7 +52,7 @@ const doNope = (params, game, successState) => {
         return
     }
     const hand = game.hands[nopePlayer.handIndex]
-    const nopePos = hand.indexOf(Cards.NOPE)
+    const nopePos = params.cardIndices ? params.cardIndices[0] : hand.indexOf(Cards.NOPE)  // todo clean this up
     if (nopePos == -1) {
         return
     }
@@ -223,7 +230,7 @@ export const TurnStateHandlers = {
         const action = params.action
         if (action == "timer") {
             return TurnStates.ATTACKING
-        }
+        }  // todo where's nope?
     },
     [TurnStates.PLAYING_FAVOUR]: (params, game) => {
         const action = params.action
@@ -320,7 +327,7 @@ export const TurnStateHandlers = {
         const action = params.action
         console.log("Favour-receiginhg ", params)
         if (action == "clicked-card") {
-            const target = game.players.find(p => p.playerId == params.playerId)
+            const target = game.players.find(p => p.playerId == params.playerId)  // todo verify that target is game.targetPlayerId ?
             const player = game.players[game.playerTurn]
             const hand = game.hands[target.handIndex]
             if (hand[params.targetCardIndex] === undefined) {

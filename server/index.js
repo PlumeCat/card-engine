@@ -4,7 +4,7 @@
 
 import express from "express"
 import { dealCards } from "./deck.js"
-import { TurnStateHandlers } from "./turn.js"
+import { TurnStateHandlers, checkNope } from "./turn.js"
 
 const app = express()
 app.use(express.json())
@@ -138,6 +138,9 @@ app.get("/leave", (req, res) => {
 
 const onMatchAction = (params, game) => {
     try {
+        if (checkNope(params, game)) {  // todo find a cleaner way of doing this
+            params.action = "nope"
+        }
         console.log("Match action: ", params, " | ", game.turnState)
         const newState = TurnStateHandlers[game.turnState](params, game)
         if (newState === undefined) {
