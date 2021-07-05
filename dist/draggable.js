@@ -16,8 +16,8 @@ export default class Draggable {
         this.currentPlayerNode = null
         this.currentDropZone = null
         this.cardsOnLeftQty = null
-        this.activeTimer = null
         this.dragTimeout = 500
+        this.moveTimeout = 50
 
         this.dragee = null
         this.listeners = null
@@ -41,13 +41,53 @@ export default class Draggable {
         this.listeners = null
     }
     initiateDrag(event, cardIdx) {
-        this.activeTimer = setTimeout(() => {this.handleDragSelectedCards(event, cardIdx)}, this.dragTimeout)
+        const previousMouse = {x: event.clientX, y: event.clientY}
+        const currentMouse = {x: event.clientX, y: event.clientY}
+
+        const handleMouseMove = (e) => {
+            currentMouse.x = e.clientX; currentMouse.y = e.clientY
+        }
+        window.addEventListener("mousemove", handleMouseMove)
+
+        // do nothing if mouseup before timeout/significant mousemove
         const handleMouseUp = () => {
-            clearTimeout(this.activeTimer)
-            this.activeTimer = null
-            window.removeEventListener("mouseup", handleMouseUp)
+            cleanup()
         }
         window.addEventListener("mouseup", handleMouseUp)
+
+        // start dragging if mousedown for long enough
+        const dragDelayTimer = setTimeout(() => {
+            cleanup()
+            this.handleDragSelectedCards(event, cardIdx)
+        }, this.dragTimeout)
+
+        const multipleSelected = this.selectedCardsIndices.length > 1 || (this.selectedCardsIndices.length && !this.selectedCardsIndices.includes(cardIdx))
+        const minSpeed = multipleSelected ? 200 : 100  // px/s
+        const minDist = multipleSelected ? 40 : 20  // px
+        let doubleChecked = false
+
+        // start dragging if mouse moves significantly
+        const moveInterval = setInterval(() => {
+            const speed = Math.hypot(currentMouse.x-previousMouse.x, currentMouse.y-previousMouse.y) / (this.moveTimeout / 1000)  // px/s
+            const dist  = Math.hypot(currentMouse.x-event.clientX, currentMouse.y-event.clientY)
+            // console.log(`${speed} px/s (${speed/1000} px/ms)   dist ${dist} px`, )
+            if (speed > minSpeed || dist > minDist) {
+                if (doubleChecked) {
+                    cleanup()
+                    this.handleDragSelectedCards(event, cardIdx)
+                }
+                else { doubleChecked = true }
+            }
+            else { doubleChecked = false }
+            previousMouse.x = currentMouse.x; previousMouse.y = currentMouse.y
+        }, this.moveTimeout)
+
+        const cleanup = () => {
+            clearTimeout(dragDelayTimer)
+            clearInterval(moveInterval)
+            window.removeEventListener("mouseup", handleMouseUp)
+            window.removeEventListener("mousemove", handleMouseMove)
+        }
     }
     handleDragSelectedCards(e, cardIdx) {
         e.preventDefault()
@@ -73,6 +113,7 @@ export default class Draggable {
         this.dragee.style.left = (e.clientX - (this.dragee.offsetWidth/2)) + "px"
 
         $(this.renderNodeId).classList.add('dragging')
+
         if (this.playState.isGivingFavour()) {
             if (this.selectedCardsIndices.length === 1) {
                 this.currentPlayerNode = $(`oppHand-${this.playState.currentPlayer.playerId}`)

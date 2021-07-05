@@ -383,6 +383,20 @@ class MatchScreen extends GameScreen {
     bindEvents() {
         const { game, playerId } = this.playState
 
+        if (this.matchState === MatchState.PLAYING) {
+            $('matchPlayCont').addEventListener("click", e => {
+                let el = e.target
+                while (el) {
+                    if (el.classList && el.classList.contains('enabled')) {
+                        return
+                    }
+                    el = el.parentNode
+                }
+                this.selectedCardsIndices = []
+                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+            })
+        }
+
         // player selects their cards when clicked
         if (this.matchState === MatchState.PLAYING) {
             for (let i = 0; i < this.playState.hand.length; i++) {
@@ -420,7 +434,7 @@ class MatchScreen extends GameScreen {
                 ...this.playState.apiParams()
             }).catch(alert)
         })
-        $("matchRemPileTopCard")?.addEventListener("click", e => {  // todo change form click to draggable
+        $$("#matchRemPileTopCard.enabled")?.addEventListener("click", e => {  // todo change form click to draggable
             apiPost("/action", {
                 action: "pick",
                 ...this.playState.apiParams()

@@ -355,8 +355,11 @@ button[disabled] {
     text-align: center;
     border-radius: 5px;
 }
+.matchCardPileCont {
+    padding: 20px;
+}
 .matchCardPileCont .fuCardB {
-    margin: 20px;
+    margin: 0;
 }
 .matchCardStack {
     height: 150px;
