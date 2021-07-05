@@ -8,7 +8,7 @@ import renderModal from "/modals.js"
 import { TurnStates } from "/turn.js"
 import Draggable from "/draggable.js"
 import { $, $$, $$$ } from "/dollar.js"
-import { ChooseOppTurnStates, ModalTurnStates, getTurnStateMsg } from "/turn_states.js"
+import { ChooseOppTurnStates, ModalTurnStates, ComboTurnStates, getTurnStateMsg } from "/turn_states.js"
 import { apiPost, apiGet } from "/api_client.js"
 
 const MatchState = {
@@ -199,6 +199,8 @@ class MatchScreen extends GameScreen {
     onRender() {
         const { playerId, playerName, gameId } = this.playState
         if (this.matchState === MatchState.PLAYING) {
+            // todo ?? found the below bug by chance. need to examine all the ways in which player's hand may be changed
+            this.selectedCardsIndices = this.selectedCardsIndices.filter(i => i < this.playState.hand.length)
             return this.renderMatchPlay()
         } else if (this.matchState === MatchState.WAITING) {
             return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p>`
@@ -209,7 +211,7 @@ class MatchScreen extends GameScreen {
         }
     }
     renderMatchPlay() {
-        const { playerId, playerName, gameId, game } = this.playState
+        const { playerId, playerName, gameId } = this.playState
         return `
             <div id="matchPlayCont">
                 <div id="matchPlayersTop">${this.renderOppHand('top')}</div>
@@ -217,7 +219,7 @@ class MatchScreen extends GameScreen {
                     <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
                     <div id="matchPlayArea">
                         <div id="matchPilesCont">
-                            ${this.renderMatchPiles(game)}
+                            ${this.renderMatchPiles()}
                         </div>
                         ${this.renderPlayInfo()}
                     </div>
@@ -248,17 +250,78 @@ class MatchScreen extends GameScreen {
             ${this.playState.showModal() ? renderModal(this.playState) : ''}
         `
     }
-    renderDiscardPileTop(cards) {
-        const card = [...cards].pop()
-        return `
-        <div class="fuCardB fuCard${getShortCardName(card)}" id="matchDiscardPileTopCard">${getCardInnerHtml(card)}</div>
-        `
+    calcDiscardPositions(posLength, size) {
+        const refEl = $$('#matchDiscardPile .fuCardB')  // one of these should always exist in the dom
+        const cH = refEl.offsetHeight, cW = refEl.offsetWidth
+        const positions = posLength <= 4 ? [
+            {top: (0.00 - 0) * cH, left: 0.00 * cW},  // 0
+            {top: (0.05 - 1) * cH, left: 0.85 * cW},  // 1
+            {top: (0.50 - 2) * cH, left: 0.53 * cW},  // 2
+            {top: (0.10 - 3) * cH, left: 1.70 * cW},  // 3
+        ] : [
+            {top: (0.00 - 0) * cH, left: 1.06 * 0.0 * cW},  // 0
+            {top: (0.00 - 1) * cH, left: 1.06 * 1.0 * cW},  // 1
+            {top: (0.52 - 2) * cH, left: 1.06 * 0.5 * cW},  // 2
+            {top: (0.00 - 3) * cH, left: 1.06 * 2.0 * cW},  // 3
+            {top: (0.52 - 4) * cH, left: 1.06 * 1.5 * cW},  // 4
+
+            {top: ((0.52 * 2.0) - 5) * cH, left: 1.06 * 0.0 * cW},  // 5
+            {top: ((0.52 * 2.0) - 6) * cH, left: 1.06 * 1.0 * cW},  // 6
+            {top: ((0.52 * 2.0) - 7) * cH, left: 1.06 * 2.0 * cW},  // 7
+            {top: ((0.52 * 3.0) - 8) * cH, left: 1.06 * 0.5 * cW},  // 8
+            {top: ((0.52 * 3.0) - 9) * cH, left: 1.06 * 1.5 * cW},  // 9
+        ]
+        if (!size) {
+            return positions
+        }
+        return positions.map((pos, i, arr) => {
+            const prev = i ? arr[i-1] : {width: 0, height:0}
+            pos.width = Math.max(prev.width, pos.left + cW)
+            pos.height = Math.max(prev.height, pos.top + ((i+1) * cH))
+            return {width: pos.width, height: pos.height}
+        })
     }
-    renderMatchPiles(game) {
+    adjustMatchDiscardPile() {
+        const len = $('matchDiscardPile').children.length
+        const sizes = this.calcDiscardPositions(len, true)
+        const size = sizes[len-1]
+        $('matchDiscardPile').style.width = `${size.width}px`
+        $('matchDiscardPile').style.height = `${size.height}px`
+    }
+    renderDiscardPileTop(cards) {
+        const { game } = this.playState
+        if (!Array.isArray(cards)) {
+            if (this.playState.turnState.startsWith('NOPE_')) {
+                cards = game.discard.slice(0, $('matchDiscardPile').children.length+(this.preNopeDisplayed ? 0 : 1))
+                this.preNopeDisplayed = false
+            }
+            else {
+                cards = game.discard.slice(0, cards)
+            }
+        }
+        else if (cards.length === 1 && cards[0].value === Cards.NOPE.value) {
+            cards.push(...game.discard.slice(0, $('matchDiscardPile').children.length))
+            this.preNopeDisplayed = true  // todo find a better solution than this?
+        }
+        if (cards.length === 1) {
+            return `
+            <div class="fuCardB fuCard${getShortCardName(cards[0])}" id="matchDiscardPileTopCard">${getCardInnerHtml(cards[0])}</div>
+            `
+        }
+        const positions = this.calcDiscardPositions(cards.length)
+        return [...cards].reverse().map((card, i) => `
+        <div class="fuCardB fuCard${getShortCardName(card)}" style="position: relative; top: ${positions[i].top}px; left: ${positions[i].left}px;">
+            ${getCardInnerHtml(card)}
+        </div>
+        `).join('')
+    }
+    renderMatchPiles() {
+        const { game } = this.playState
         const remainderCount = game.remainder.length <= 10 ? game.remainder.length
                              : game.remainder.length < 15 ? '10+'
                              : game.remainder.length < 20 ? '15+'
                              : '?'
+        const ts = this.playState.turnState
         const discard = [`
             <div class="matchCardStackCont" id="matchDiscardStack">
                 <span>Discard</span>
@@ -270,7 +333,7 @@ class MatchScreen extends GameScreen {
         `, `
             <div class="matchCardPileCont" id="matchDiscardPile">
                 ${game.discard.length ? 
-                    this.renderDiscardPileTop([game.discard[0]])
+                    this.renderDiscardPileTop((ComboTurnStates.includes(ts) && game.discard[0].value !== Cards.NOPE.value) ? parseInt(ts[ts.search(/COMBO/)+5]) : 1)
                   : `
                     <div class="fuCardB invis"><div class="fuCardInner"></div></div>
                 `}
@@ -395,6 +458,9 @@ class MatchScreen extends GameScreen {
                 this.selectedCardsIndices = []
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
             })
+        }
+        if (this.matchState === MatchState.PLAYING && $('matchDiscardPile').children.length > 1) {
+            this.adjustMatchDiscardPile()
         }
 
         // player selects their cards when clicked

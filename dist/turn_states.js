@@ -14,6 +14,15 @@ export const ModalTurnStates = [
     TurnStates.DEFUSING,
 ]
 
+export const ComboTurnStates = [
+    TurnStates.PLAYING_COMBO2,
+    TurnStates.PLAYING_COMBO3,
+    TurnStates.PLAYING_COMBO5,
+    TurnStates.COMBO2_STEALING,
+    TurnStates.COMBO3_NOMINATING,
+    TurnStates.COMBO5_RECLAIMING,
+]
+
 export const getTurnStateMsg = (state) => {
     const bold = b => `<b>${b}</b>`
     const currentPlayer = bold(state.currentPlayer.playerName)
@@ -48,7 +57,7 @@ export const getTurnStateMsg = (state) => {
              : isTarget ? `${currentPlayer} is nominating a card to request from ${bold('you')}`
              : `${currentPlayer} is nominating a card to request from ${targetPlayer}`
     }
-    if (turnState === TurnStates.COMBO5_RECLAIMING) {
+    if (turnState === TurnStates.COMBO5_RECLAIMING) {  // todo need msg for what was reclaimed
         return isPlayer ? `pick a card from the discard pile...`
              : `${currentPlayer} is reclaiming a card from the discard pile...`
     }

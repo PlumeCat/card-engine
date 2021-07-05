@@ -272,7 +272,7 @@ export const TurnStateHandlers = {
     [TurnStates.PLAYING_COMBO5]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return TurnStates.COMBO5_RECLAIMING
+            return TurnStates.COMBO5_RECLAIMING  // todo handle the discard pile being empty
         } else if (action == "nope") {
             return doNope(params, game, TurnStates.NOPE_COMBO5_ODD)
         }
@@ -429,7 +429,7 @@ export const TurnStateHandlers = {
     [TurnStates.NOPE_COMBO2_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return TurnStates.COMBO2_STEALING
+            return TurnStates.COMBO2_STEALING  // todo BUG! player ends up here without having chosen a target player
         } else if (action == "nope") {
             return doNope(params, game, TurnStates.NOPE_COMBO2_ODD)
         }

@@ -265,9 +265,9 @@ export default class Draggable {
         }
         else if (this.currentDropZone && (this.currentDropZone.id === 'matchDiscardPile')) {
             console.log("PLAY (draggable)")
-            const oldCards = $('matchDiscardPile').innerHTML
             const cards = this.selectedCardsIndices.map(i => this.playState.hand[i])
             $('matchDiscardPile').innerHTML = this.match.renderDiscardPileTop(cards)
+            if (cards.length > 1) this.match.adjustMatchDiscardPile()
             apiPost("/action", {
                 action: "play",
                 cardIndices: this.selectedCardsIndices,
@@ -277,7 +277,6 @@ export default class Draggable {
                 document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
             }).catch(err => {
                 alert(err)
-                $('matchDiscardPile').innerHTML = oldCards
                 // this.cancelDragSelectedCards()  // todo this doesnt work, because dragee is already removed :(
                 // forcing a re-render, until the cancelDrag thing can work... unless a force rerender is actually fine?
                 this.playState.forceRerender()

@@ -366,6 +366,9 @@ button[disabled] {
     overflow-y: auto;
 }
 #matchDiscardPile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     border-radius: 5px;
 }
 
