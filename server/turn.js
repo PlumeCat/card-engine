@@ -230,7 +230,9 @@ export const TurnStateHandlers = {
         const action = params.action
         if (action == "timer") {
             return TurnStates.ATTACKING
-        }  // todo where's nope?
+        } else if (action == "nope") {
+            return doNope(params, game, TurnStates.NOPE_ATTACK_ODD)
+        }
     },
     [TurnStates.PLAYING_FAVOUR]: (params, game) => {
         const action = params.action
@@ -239,12 +241,16 @@ export const TurnStateHandlers = {
             // todo check target player is alive and has cards? (also check for situations where no player is viable target (all dead/zero cards)
             game.targetPlayerId = params.targetPlayerId
             return TurnStates.FAVOUR_RECEIVING
+        } else if (action == "nope") {
+            return doNope(params, game, TurnStates.NOPE_FAVOUR_ODD)
         }
     },
     [TurnStates.PLAYING_SHUFFLE]: (params, game) => {
         const action = params.action
         if (action == "timer") {
             return TurnStates.SHUFFLING
+        } else if (action == "nope") {
+            return doNope(params, game, TurnStates.NOPE_SHUFFLE_ODD)
         }
     },
     [TurnStates.PLAYING_COMBO2]: (params, game) => {
@@ -429,7 +435,7 @@ export const TurnStateHandlers = {
     [TurnStates.NOPE_COMBO2_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return TurnStates.COMBO2_STEALING  // todo BUG! player ends up here without having chosen a target player
+            return TurnStates.PLAYING_COMBO2  // todo BUG! player ends up here without having chosen a target player
         } else if (action == "nope") {
             return doNope(params, game, TurnStates.NOPE_COMBO2_ODD)
         }
@@ -445,7 +451,7 @@ export const TurnStateHandlers = {
     [TurnStates.NOPE_COMBO3_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return TurnStates.COMBO3_NOMINATING
+            return TurnStates.PLAYING_COMBO3
         } else if (action == "nope") {
             return doNope(params, game, TurnStates.NOPE_COMBO3_ODD)
         }
@@ -501,7 +507,7 @@ export const TurnStateHandlers = {
     [TurnStates.NOPE_FAVOUR_ODD]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return TurnStates.FAVOUR_RECEIVING
+            return TurnStates.START
         } else if (action == "nope") {
             return doNope(params, game, TurnStates.NOPE_FAVOUR_EVEN)
         }
@@ -509,7 +515,9 @@ export const TurnStateHandlers = {
     [TurnStates.NOPE_FAVOUR_EVEN]: (params, game) => {
         const action = params.action
         if (action == "timer") {
-            return TurnStates.START
+            return TurnStates.PLAYING_FAVOUR
+            // TODO: fix the infinite-timer for pick-player states (favour, combo2, etc) 
+            //  just picks a player at random if the picker takes too long
         } else if (action == "nope") {
             return doNope(params, game, TurnStates.NOPE_FAVOUR_ODD)
         }
