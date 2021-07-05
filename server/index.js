@@ -36,13 +36,18 @@ const nextId = (() => {
         return _
     }
 })()
-const createPlayer = (playerName, ready = false) => ({ playerId: nextId(), playerName, ready, alive: true })
+const createPlayer = (playerName, ready = false) => ({
+    playerId: nextId(),
+    playerName,
+    ready,
+    alive: true
+})
 
-const createGame = (playerName) => {
+const createGame = () => {
     const game = {
         winner: "",
         matchState: MatchState.WAITING,
-        players: [ createPlayer(playerName) ],
+        players: [],
         playerTurn: 0,
         hands: [],
         discard: [],
@@ -73,14 +78,14 @@ app.get("/create-game", (req, res) => {
     } while (games[gameId])
     
     // create a new game, add to active games
-    const game = createGame(playerName)
-    games[gameId] = game
+    games[gameId] = createGame()
+    games[gameId].players.push(createPlayer(playerName))
 
     // the calling player joins immediately
     return res.status(200).send({
         gameId: gameId,
         playerName: playerName,
-        playerId: game.players[0].playerId
+        playerId: games[gameId].players[0].playerId
     })
 })
 
@@ -210,10 +215,14 @@ app.post("/action", (req, res) => {
             if (game.players.every(p => p.ready)) {
                 // TODO: reset match state, deal new cards etc
                 game.players.forEach(p => {
-                    p.ready = false
+                    p.ready = false,
+                    p.alive = true
                 })
                 if (game.players.length === 4) {
                     game.matchState = MatchState.PLAYING
+                    games[gameId] = createGame()
+                    games[gameId].matchState = MatchState.PLAYING
+                    games[gameId].players = game.players
                 } else {
                     game.matchState = MatchState.WAITING
                 }
