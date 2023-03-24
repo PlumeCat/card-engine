@@ -419,6 +419,10 @@ class MatchScreen extends GameScreen {
         </div>
         `
     }
+    deselectCardsInHand() {
+        this.selectedCardsIndices = []
+        document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+    }
     validToPickCard(){
         return true  // todo complete this later
     }
@@ -455,8 +459,7 @@ class MatchScreen extends GameScreen {
                     }
                     el = el.parentNode
                 }
-                this.selectedCardsIndices = []
-                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+                this.deselectCardsInHand()
             })
         }
         if (this.matchState === MatchState.PLAYING && $('matchDiscardPile').children.length > 1) {
@@ -473,8 +476,7 @@ class MatchScreen extends GameScreen {
                     }
                     else {
                         if (this.playState.isGivingFavour()) {
-                            this.selectedCardsIndices = []
-                            document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+                            this.deselectCardsInHand()
                         }
                         this.selectedCardsIndices.push(i)
                         $(`hand-card-${i}`).classList.add('fuCardSelected')
@@ -486,7 +488,7 @@ class MatchScreen extends GameScreen {
                     if (e.button !== 0) {
                         return
                     }
-                    this.draggable.initiateDrag(e, i)
+                    this.draggable.initiateDragSelectedCards(e, i)
                 })
             }
         }
@@ -500,11 +502,11 @@ class MatchScreen extends GameScreen {
                 ...this.playState.apiParams()
             }).catch(alert)
         })
-        $$("#matchRemPileTopCard.enabled")?.addEventListener("click", e => {  // todo change form click to draggable
-            apiPost("/action", {
-                action: "pick",
-                ...this.playState.apiParams()
-            }).catch(alert)
+        $$("#matchRemPileTopCard.enabled")?.addEventListener("mousedown", e => {  // should only be enabled if validation passed
+            if (e.button !== 0) {
+                return
+            }
+            this.draggable.initiateDragSelectedCards(e, 'deck')
         })
 
         $("play-button")?.addEventListener("click", () => {
@@ -514,8 +516,7 @@ class MatchScreen extends GameScreen {
                 cardIndices: this.selectedCardsIndices,
                 ...this.playState.apiParams()
             }).then(() => {
-                this.selectedCardsIndices = []
-                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+                this.deselectCardsInHand()
             }).catch(alert)
         })
 
@@ -603,8 +604,7 @@ class MatchScreen extends GameScreen {
                 targetCardIndex: this.selectedCardsIndices[0],
                 ...this.playState.apiParams()
             }).then(() => {
-                this.selectedCardsIndices = []
-                document.querySelectorAll('.fuCard').forEach(c => c.classList.remove('fuCardSelected'))
+                this.deselectCardsInHand()
             }).catch(alert)
         })
 

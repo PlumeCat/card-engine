@@ -214,7 +214,7 @@ export const TurnStateHandlers = {
                     return TurnStates.END
                 }
             } else {
-                hand.push(card)
+                hand.splice(params.insertPos ?? hand.length, 0, card)
                 return TurnStates.END
             }
         }

@@ -18,6 +18,7 @@ export default class Draggable {
         this.cardsOnLeftQty = null
         this.dragTimeout = 500
         this.moveTimeout = 50
+        this.cardW = 125;  // todo dont hardcode
 
         this.dragee = null
         this.listeners = null
@@ -40,7 +41,8 @@ export default class Draggable {
         }
         this.listeners = null
     }
-    initiateDrag(event, cardIdx) {
+    /** cardIdx is "deck" if card is being dragged form deck, else it is the index of selected card in hand */
+    initiateDragSelectedCards(event, cardIdx) {
         const previousMouse = {x: event.clientX, y: event.clientY}
         const currentMouse = {x: event.clientX, y: event.clientY}
 
@@ -91,22 +93,31 @@ export default class Draggable {
     }
     handleDragSelectedCards(e, cardIdx) {
         e.preventDefault()
+        const isDeck = cardIdx === "deck"
 
-        if (!this.selectedCardsIndices.includes(cardIdx)) {
+        if (isDeck) {
+            this.match.deselectCardsInHand()  // ensure no selected cards in hand
+        }
+
+        if (!isDeck && !this.selectedCardsIndices.includes(cardIdx)) {
             this.selectedCardsIndices.push(cardIdx)
             $(`hand-card-${cardIdx}`).classList.add('fuCardSelected')
         }
         this.selectedCardsIndices.sort((a, b) => a - b)
 
         const cardsRem = [...Array(this.playState.hand.length).keys()].filter(j => !this.selectedCardsIndices.includes(j))
-        const refEl = $(`${this.cardContId}${cardsRem.length ? cardsRem[0] : 0}`)
-        const squish = this.getSquish(refEl.offsetWidth)
+        const squish = this.getSquish(this.cardW)
 
         this.dragee = document.body.appendChild(document.createElement('div'))
-        this.dragee.id = 'drag-hand-cards'
+        // this.dragee.id = 'drag-hand-cards'
         this.dragee.classList.add('draggable', 'flex')
-        for (let idx of this.selectedCardsIndices) {
-            this.dragee.appendChild($(`${this.cardContId}${idx}`))
+        if (isDeck) {
+            this.dragee.innerHTML = `<div class="fduCard fuCardB"><div class="fuCardInner"></div></div>`
+        }
+        else {
+            for (let idx of this.selectedCardsIndices) {
+                this.dragee.appendChild($(`${this.cardContId}${idx}`))
+            }
         }
 
         this.dragee.style.top = (e.clientY - (this.dragee.offsetHeight/2)) + "px"
@@ -114,27 +125,29 @@ export default class Draggable {
 
         $(this.renderNodeId).classList.add('dragging')
 
-        if (this.playState.isGivingFavour()) {
-            if (this.selectedCardsIndices.length === 1) {
-                this.currentPlayerNode = $(`oppHand-${this.playState.currentPlayer.playerId}`)
-                this.currentPlayerNode.classList.add('dropZone')
-                this.currentPlayerNode.style.padding = '40px'
+        if (!isDeck) {
+            if (this.playState.isGivingFavour()) {
+                if (this.selectedCardsIndices.length === 1) {
+                    this.currentPlayerNode = $(`oppHand-${this.playState.currentPlayer.playerId}`)
+                    this.currentPlayerNode.classList.add('dropZone')
+                    this.currentPlayerNode.style.padding = '40px'
+                }
             }
-        }
-        else {
-            $('matchDiscardPile').classList.add('dropZone')  // todo more validation for this!
+            else {
+                $('matchDiscardPile').classList.add('dropZone')  // todo more validation for this!
+            }
         }
 
         this.addListeners({
-            'mousemove': e => this.handleCardMouseMove(e, refEl, cardsRem, squish),
-            'mouseup': e => this.handleCardMouseUp(e, cardsRem),
+            'mousemove': e => this.handleCardMouseMove(e, cardsRem, squish),
+            'mouseup': e => this.handleCardMouseUp(e, cardsRem, isDeck),
             'keyup': e => this.handleEscKeyUp(e),
         })
     }
-    getSquish(refElWidth) {
+    getSquish(cardW) {
         const handLen = this.playState.hand.length
 
-        if (refElWidth * handLen > $('playerHand').offsetWidth) {
+        if (cardW * handLen > $('playerHand').offsetWidth) {
             const winW = window.innerWidth - (5*2)  // 2 x player hand margin 5px (beware magic number!)
             const minMargin = 5, maxCardP = 15, maxCardW = 75  // hardcoded css values???
             const cardW = winW / handLen
@@ -185,7 +198,7 @@ export default class Draggable {
             }
         }
     }
-    handleCardMouseMove(e, refEl, cardsRem, squish) {
+    handleCardMouseMove(e, cardsRem, squish) {
         e.preventDefault()
 
         this.dragee.style.top = (e.clientY - (this.dragee.offsetHeight/2)) + "px"
@@ -202,7 +215,7 @@ export default class Draggable {
                     const ghost = document.body.appendChild(document.createElement('div'))
                     ghost.classList.add('flex')
                     ghost.id = this.ghostId
-                    ghost.innerHTML = `<div class="fuCard"><div class="fuCardInner"></div></div>`.repeat(this.selectedCardsIndices.length)
+                    ghost.innerHTML = `<div class="fuCard"><div class="fuCardInner"></div></div>`.repeat(this.selectedCardsIndices.length || 1)
                     if (squish) { this.applySquish(squish) }
                 }
             }
@@ -220,10 +233,10 @@ export default class Draggable {
         }
 
         if (dropZone && dropZone.id === 'playerHand') {
-            this.handleCardMouseMoveGhost(e, refEl, cardsRem, dropZone)
+            this.handleCardMouseMoveGhost(e, cardsRem, dropZone)
         }
     }
-    handleCardMouseMoveGhost(e, refEl, cardsRem, dropZone) {
+    handleCardMouseMoveGhost(e, cardsRem, dropZone) {
         if (!cardsRem.length) {
             if (!dropZone.children.length) {
                 dropZone.appendChild($(this.ghostId))
@@ -231,8 +244,7 @@ export default class Draggable {
             return
         }
         const relMouseX = e.clientX - dropZone.offsetLeft
-        const cardWidth = refEl.offsetWidth  // assumes all cards are same dimensions
-        const cardsOnLeftQty = Math.floor((relMouseX + (cardWidth/2) - (cardWidth * this.selectedCardsIndices.length * 0.5)) / cardWidth)
+        const cardsOnLeftQty = Math.floor((relMouseX + (this.cardW/2) - (this.cardW * (this.selectedCardsIndices.length||1) * 0.5)) / this.cardW)
         if (cardsOnLeftQty === this.cardsOnLeftQty) {
             return
         }
@@ -241,26 +253,37 @@ export default class Draggable {
 
         dropZone.insertBefore($(this.ghostId), cardAfter)
     }
-    handleCardMouseUp(e, cardsRem) {
+    handleCardMouseUp(e, cardsRem, isDeck) {
+
         if (this.currentDropZone && (this.currentDropZone.id === 'playerHand' && $(this.ghostId))) {
             // drag completed on player hand drop zone
             $(this.ghostId).replaceWith(...this.dragee.children)
-            cardsRem.splice(this.cardsOnLeftQty, 0, ...this.selectedCardsIndices)
 
-            if (!cardsRem.every((c, i) => !i || c > cardsRem[i-1])) {
-                // card order has changed (is no longer ascending)
-                const newSelection = this.selectedCardsIndices.map((_, i) => this.cardsOnLeftQty + i)
-                console.log("UPDATE HAND", cardsRem)
+            if (isDeck) {
                 apiPost("/action", {
-                    action: "update-hand",
-                    updatedHandIndices: cardsRem,
+                    action: "pick",
+                    insertPos: this.cardsOnLeftQty,
                     ...this.playState.apiParams()
-                }).then(() => {
-                    this.selectedCardsIndices = newSelection
-                }).catch(err => {
-                    alert(`error while arranging cards: ${err}`)  // todo need to handle this properly. revert back to previous hand order. force rerender for now
-                    this.playState.forceRerender()
-                })
+                }).catch(alert)
+            }
+            else {
+                cardsRem.splice(this.cardsOnLeftQty, 0, ...this.selectedCardsIndices)
+
+                if (!cardsRem.every((c, i) => !i || c > cardsRem[i - 1])) {
+                    // card order has changed (is no longer ascending)
+                    const newSelection = this.selectedCardsIndices.map((_, i) => this.cardsOnLeftQty + i)
+                    console.log("UPDATE HAND", cardsRem)
+                    apiPost("/action", {
+                        action: "update-hand",
+                        updatedHandIndices: cardsRem,
+                        ...this.playState.apiParams()
+                    }).then(() => {
+                        this.selectedCardsIndices = newSelection
+                    }).catch(err => {
+                        alert(`error while arranging cards: ${err}`)  // todo need to handle this properly. revert back to previous hand order. force rerender for now
+                        this.playState.forceRerender()
+                    })
+                }
             }
         }
         else if (this.currentDropZone && (this.currentDropZone.id === 'matchDiscardPile')) {
