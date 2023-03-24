@@ -144,7 +144,8 @@ button[disabled] {
     display: flex;
     margin: 5px;
     border-radius: 5px;
-    min-width: 65px;
+    min-width: 125px;
+    min-height: 150px;
     overflow-x: auto;
     align-items: center;
 }
