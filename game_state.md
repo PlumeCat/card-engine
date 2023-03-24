@@ -1,7 +1,19 @@
 # game2.md
 
+## turn:
+	Optional: Play see-future [nope-chain]
+	Combo x2 [nope-chain], pick
+    Combo x3 [nope-chain], pick
+    Combo x5 [nope-chain], pick
+	Skip [nope-chain [pick] ]
+	Attack [nope-chain [pick] ]
+	Favor [nope-chain] pick
+	Shuffle [nope-chain] pick
+    pick
+
+
 Start of turn
-    Click "play"
+    Drag card
         - "2-of-a-kind"         -> Playing combo x2
         - "3-of-a-kind"         -> Playing combo x3
         - "5 different"         -> Playing combo x5

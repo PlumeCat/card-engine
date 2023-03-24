@@ -162,7 +162,7 @@ class MenuScreen extends GameScreen {
     onRender() {
         return `
         <div>
-            <h2>exploding kittens</h2>
+            <h2>detonating doggies</h2>
             <span>player name:</span><input id="name-input"/>
             <br>
             <span>game ID:</span><input id="game-id-input"/>

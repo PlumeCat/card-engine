@@ -23,13 +23,12 @@ const MatchState = {
     PLAYING: 1,
     COMPLETE: 2
 }
-
 const PORT = 3000
 const A = 'A'.charCodeAt(0)
 const Z = 'Z'.charCodeAt(0) + 1
+let games = {}
 
-const makeGameId0 = () => String.fromCharCode(Math.floor(Math.random() * (Z - A) + A))
-const makeGameId = (n = 4) => Array.from({ length: n }).map(makeGameId0).join("")
+const makeGameId = (n = 4) => Array.from({ length: n }).map(() => String.fromCharCode(Math.floor(Math.random() * (Z - A) + A))).join("")
 const nextId = (() => {
     // TODO: problem after (1 << 40) players
     let _ = 0
@@ -67,11 +66,11 @@ const createGame = () => {
 }
 
 
-let games = {}
 
 
 app.get("/create-game", (req, res) => {
     const playerName = req.query["playerName"] || 'player 1'
+    const numBots = req.query["numBots"] || 0
     
     // get a new unique game id
     let gameId = ""

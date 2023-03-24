@@ -1,6 +1,23 @@
-# exploding kittens
+# detonating doggies
 
 hardcoded for 4 players
+
+- hot dog
+- sausage dog
+- sheepdog
+- dogtor
+- underdog
+- dogfood
+- watchdog
+- bulldog
+- sea dog (pirate)
+- dogfight (for attack)
+- doghouse
+- dogfish
+- dogmatism
+
+- "bomberanian" for the grenade card
+
 
 ## list of cards
     cat-rainbow x4
@@ -17,21 +34,12 @@ hardcoded for 4 players
     bomb x3
     defuse x6
 <!-- Nyan cat? -->
-<!-- Grenade cat? Possibly overpowered -->
+<!-- Grenade dog? "Bomberanian" Possibly overpowered -->
     Combos:
         2x same: pick another players card (hidden)
         3x same: nominate player + card
         5x different: pick from discarded
 
-## turn:
-	Optional: Play see-future [nope-chain]
-	Combo x2 [nope-chain], pick
-    Combo x3 [nope-chain], pick
-    Combo x5 [nope-chain], pick
-	Skip [nope-chain [pick] ]
-	Attack [nope-chain [pick] ]
-	Favor [nope-chain] pick
-	Shuffle [nope-chain] pick
 
 
 ## states
