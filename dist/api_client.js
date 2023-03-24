@@ -1,5 +1,6 @@
 // helper functions
-const API_PATH = "//localhost:3000"
+
+const API_PATH = "http://localhost:3000"
 const makeParams = (params) => (params ? Object.entries(params).reduce((value, entry, i) => value + `${i ? "&" : ""}${encodeURIComponent(entry[0])}=${encodeURIComponent(entry[1])}`, "?") : "")
 const api = (method, path, params, headers, body) => fetch(API_PATH + path + makeParams(params), {
         method: method,

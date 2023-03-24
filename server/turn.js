@@ -64,6 +64,12 @@ const doNope = (params, game, successState) => {
     return successState
 }
 
+export const MatchState = {
+    WAITING: "WAITING",
+    PLAYING: "PLAYING",
+    COMPLETE: "COMPLETE"
+}
+
 export const TurnStates = [
     "START",
     "PLAYING_SEE_FUTURE",
@@ -171,6 +177,10 @@ export const TurnStateHandlers = {
                 if ((new Set(cards)).size != 5) {
                     return
                 }
+                if (!cards.every(isCatCard)) {
+                    return
+                }
+
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
                 game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
                 return TurnStates.PLAYING_COMBO5

@@ -12,9 +12,9 @@ import { ChooseOppTurnStates, ModalTurnStates, ComboTurnStates, getTurnStateMsg 
 import { apiPost, apiGet } from "/api_client.js"
 
 const MatchState = {
-    WAITING: 0,
-    PLAYING: 1,
-    COMPLETE: 2
+    WAITING: "WAITING",
+    PLAYING: "PLAYING",
+    COMPLETE: "COMPLETE"
 }
 
 

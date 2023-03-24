@@ -5,24 +5,22 @@
 import express from "express"
 import cors from "cors"
 import { dealCards } from "./deck.js"
-import { TurnStateHandlers, checkNope } from "./turn.js"
+import { TurnStateHandlers, MatchState, checkNope } from "./turn.js"
+
+const log = console.log
 
 const app = express()
 app.use(cors())
 app.use(express.json())
-app.use(express.static("./dist/"))
-app.use(express.static("./server/"))
+app.use(express.static("../dist/"))
+app.use(express.static("../server/"))
 app.use((req, res, next) => {
     res.set("Connection", "close")
     res.set("cache-control", "no-store")
     next()
 })
 
-const MatchState = {
-    WAITING: 0,
-    PLAYING: 1,
-    COMPLETE: 2
-}
+
 const PORT = 3000
 const A = 'A'.charCodeAt(0)
 const Z = 'Z'.charCodeAt(0) + 1
@@ -69,6 +67,7 @@ const createGame = () => {
 
 
 app.get("/create-game", (req, res) => {
+    log("create_game")
     const playerName = req.query["playerName"] || 'player 1'
     const numBots = req.query["numBots"] || 0
     
@@ -93,6 +92,7 @@ app.get("/create-game", (req, res) => {
 
 
 app.get("/join", (req, res) => {
+    log("join")
     const gameId = req.query["gameId"]
     // const game = games[gameId]
     const game = Object.values(games)[0]
@@ -100,25 +100,28 @@ app.get("/join", (req, res) => {
         return res.status(400).send({ message: "game not found" })
     }
     if (game.players.length > 3) {
-        console.log("Rejected connection, too many players: " + req.query["playerName"])
+        log("Rejected connection, too many players: " + req.query["playerName"])
         return res.status(400).send({ message: "too many players" })
     }
     
     const playerName = req.query["playerName"] || `player ${game.players.length + 1}`
-    console.log(`Player joined: ${playerName}`)
     game.players.push(createPlayer(playerName))
+    const playerId = game.players[game.players.length - 1].playerId
+    log(`Player joined: ${playerName} ${playerId}`)
+
     if (game.players.length == 4) {
         game.matchState = MatchState.PLAYING
         game.players.forEach((p, i) => {  p.handIndex = i })
     }
     return res.status(200).send({
         gameId: Object.keys(games)[0],
-        playerName: playerName,
-        playerId: game.players[game.players.length - 1].playerId
+        playerName,
+        playerId
     }) // TODO: return immediate game state?
 })
 
 app.get("/leave", (req, res) => {
+    log("leave")
     const gameId = req.query["gameId"]
     const playerId = parseInt(req.query["playerId"])
     const game = games[gameId]
@@ -147,12 +150,12 @@ const onMatchAction = (params, game) => {
         if (checkNope(params, game)) {  // todo find a cleaner way of doing this
             params.action = "nope"
         }
-        console.log("Match action: ", params, " | ", game.turnState)
+        log("Match action: ", params, " | ", game.turnState)
         const newState = TurnStateHandlers[game.turnState](params, game)
         if (newState === undefined) {
             return false
         }
-        console.log(`State: ${game.turnState} -> ${newState}`)
+        log(`State: ${game.turnState} -> ${newState}`)
         if (newState != game.turnState) {
             game.turnState = newState
             if (game.activeTimer) {
@@ -181,6 +184,7 @@ const onMatchAction = (params, game) => {
 }
 
 app.post("/action", (req, res) => {
+    log("action")
     const gameId = req.body["gameId"]
     //const game = games[gameId]
     const game = Object.values(games)[0]
@@ -190,7 +194,7 @@ app.post("/action", (req, res) => {
     
     const action = req.body["action"]
     const playerId = parseInt(req.body["playerId"])
-    console.log(`Player: ${playerId}, action: ${action}`)
+    log(`Player: ${playerId}, action: ${action}`)
     const player = game.players.find(p => p.playerId == playerId) //[playerIndex]
     if (!player) {
         return res.status(400).send({ message: "bad player id" })
@@ -235,6 +239,7 @@ app.post("/action", (req, res) => {
 })
 
 app.get("/state", (req, res) => {
+    log("state")
     const gameId = req.query["gameId"]
     // const game = games[gameId]
     const game = Object.values(games)[0]
@@ -251,5 +256,5 @@ app.get("/state", (req, res) => {
 })
 
 app.listen(PORT, () => {
-    console.log("listening")
+    log("listening")
 })
