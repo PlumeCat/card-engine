@@ -10,7 +10,9 @@ export default (state) => {
 <div class="modal fade show" id="exampleModalCenter" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-        ${modalContent(state)}
+        <div id="modal-content-cont">
+            ${modalContent(state)}
+        </div>
         ${modalFooter(state)}
     </div>
   </div>

@@ -34,6 +34,14 @@ const render = () => {
 }
 
 
+const preventDefault = (e) => {
+    if(!document.body.classList.contains('showModal')){
+        e.preventDefault();
+    }
+}
+
+document.body.addEventListener('touchmove', preventDefault, { passive: false });
+
 
 class PlayState {
     constructor(params) {
@@ -161,14 +169,11 @@ class MenuScreen extends GameScreen {
     }
     onRender() {
         return `
-        <div>
+        <div class="initialScreen">
             <h2>detonating doggies</h2>
-            <span>player name:</span><input id="name-input"/>
-            <br>
-            <span>game ID:</span><input id="game-id-input"/>
-            <br>
-            <button id="join-button">join</button>
-            <br>
+            <div><span>player name:</span> <input id="name-input"/></div>
+            <div><span>game ID:</span> <input id="game-id-input"/></div>
+            <button id="join-button">join</button><br>
             <button id="create-button">create</button>
         </div>
         `
@@ -184,6 +189,7 @@ class MatchScreen extends GameScreen {
         this.selectedCardsIndices = []  // todo ensure to reset this when necessary
         this.debugPiles = false
         this.draggable = new Draggable(this)
+        this.resizeHandler = () => { const margin = this.cardMargin+'px'; $$$('.fuCard').forEach(c => {c.style.margin = margin}) }
     }
     get matchState() {
         return this.playState.game.matchState
@@ -192,9 +198,18 @@ class MatchScreen extends GameScreen {
         this.interval = setInterval(this.playState.getState.bind(this.playState), this.timeout)
         document.body.innerHTML = this.renderMatch()
         this.renderNode = $(this.renderNodeId)
+        window.addEventListener('resize', this.resizeHandler)
     }
     onExit() {
         clearInterval(this.interval)
+        window.removeEventListener('resize', this.resizeHandler)
+    }
+    getCardMargin(handLen) {
+        const margin = (((window.innerWidth-10) / handLen) - 105) / 2
+        return Math.min(10, margin + (margin<0 ? (margin/handLen) : 0))
+    }
+    get cardMargin() {
+        return this.getCardMargin(this.playState.hand.length)
     }
     onRender() {
         const { playerId, playerName, gameId } = this.playState
@@ -203,15 +218,16 @@ class MatchScreen extends GameScreen {
             this.selectedCardsIndices = this.selectedCardsIndices.filter(i => i < this.playState.hand.length)
             return this.renderMatchPlay()
         } else if (this.matchState === MatchState.WAITING) {
-            return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p>`
+            return `<div class="initialScreen"><h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p></div>`
         } else {
-            return `<h2>${playerName} (${playerId}) (${gameId})</h2><p>Game over! Winner: ${this.playState.game.winner}</p>
-            ${this.playState.player.ready ? `<span>waiting for other players...</span>` : `<button id="restart-button">play again</button>`}
-            <button id="exit-button">exit</button>`
+            return `<div class="initialScreen"><h2>${playerName} (${playerId}) (${gameId})</h2><p>Game over! Winner: ${this.playState.game.winner}</p>
+            ${this.playState.player.ready ? `<span>waiting for other players...</span>` : `<button id="restart-button">play again</button>`}<br>
+            <button id="exit-button">exit</button></div>`
         }
     }
     renderMatchPlay() {
         const { playerId, playerName, gameId } = this.playState
+        document.body.classList[this.playState.showModal() ? 'add' : 'remove']('showModal')
         return `
             <div id="matchPlayCont">
                 <div id="matchPlayersTop">${this.renderOppHand('top')}</div>
@@ -221,12 +237,13 @@ class MatchScreen extends GameScreen {
                         <div id="matchPilesCont">
                             ${this.renderMatchPiles()}
                         </div>
+                        <div id="matchPlayAreaAligner"></div>
                         ${this.renderPlayInfo()}
                     </div>
                     <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
                 </div>
             </div>
-            <div id='playerSection'>
+            <div id='playerSection'>                    
                 <div id='playerHandCont'>
                     <div class="playerHandAligner"></div>
                     <div id='playerHand' class="dropZone">
@@ -235,15 +252,6 @@ class MatchScreen extends GameScreen {
                     <div class="playerHandAligner"></div>
                 </div>
                 <div id="playerHandActionsCont">
-                    <div id="playerHandActionsAligner"></div>
-                    <div class="hidden" id="playerHandActions">
-                        <button id="play-button">play</button>
-                        <button id="nope-button">nope</button>
-                        ${this.playState.isGivingFavour() ? `<button id="give-button">give</button>` : ''}
-                    </div>
-                    <div class="hidden" id="debugCont">
-                        <input type="checkbox" id="debugPilesCheck" ${this.debugPiles ? 'checked' : ''}><label for="debugPilesCheck">debug</label>
-                    </div>
                     <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                 </div>
             </div>
@@ -390,7 +398,8 @@ class MatchScreen extends GameScreen {
     renderCard(c, i) {
         return `
         <div id="hand-card-cont-${i}">
-            <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}">
+            <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}"
+            style="margin: ${this.cardMargin}px">
                 ${getCardInnerHtml(c)}
             </div>
         </div>`
@@ -483,8 +492,8 @@ class MatchScreen extends GameScreen {
                     }
                     document.querySelectorAll('#playerHandActions button').forEach(b => {b.disabled = this.buttonIsDisabled(b.id)})
                 })
-                $(`hand-card-${i}`).addEventListener("mousedown", (e) => {
-                    // todo keep cards mousemove-ing if re-render
+                $(`hand-card-${i}`).addEventListener("pointerdown", (e) => {
+                    // todo keep cards pointermove-ing if re-render
                     if (e.button !== 0) {
                         return
                     }
@@ -502,7 +511,7 @@ class MatchScreen extends GameScreen {
                 ...this.playState.apiParams()
             }).catch(alert)
         })
-        $$("#matchRemPileTopCard.enabled")?.addEventListener("mousedown", e => {  // should only be enabled if validation passed
+        $$("#matchRemPileTopCard.enabled")?.addEventListener("pointerdown", e => {  // should only be enabled if validation passed
             if (e.button !== 0) {
                 return
             }

@@ -18,7 +18,7 @@ export default class Draggable {
         this.cardsOnLeftQty = null
         this.dragTimeout = 500
         this.moveTimeout = 50
-        this.cardW = 125;  // todo dont hardcode
+        this.squishing = false
 
         this.dragee = null
         this.listeners = null
@@ -28,6 +28,15 @@ export default class Draggable {
     }
     set selectedCardsIndices(array) {
         return this.match.selectedCardsIndices = array
+    }
+    get cardMargin() {
+        return this.match.cardMargin
+    }
+    get cardMarginDeck() {
+        return this.match.getCardMargin(this.playState.hand.length + 1)
+    }
+    get cardW() {
+        return 105 + (2*(this.squishing ? this.cardMarginDeck : this.cardMargin));
     }
     addListeners(listeners) {
         this.listeners = listeners
@@ -43,21 +52,26 @@ export default class Draggable {
     }
     /** cardIdx is "deck" if card is being dragged form deck, else it is the index of selected card in hand */
     initiateDragSelectedCards(event, cardIdx) {
+        if (this.dragee) {
+            return
+        }
+
         const previousMouse = {x: event.clientX, y: event.clientY}
         const currentMouse = {x: event.clientX, y: event.clientY}
 
         const handleMouseMove = (e) => {
             currentMouse.x = e.clientX; currentMouse.y = e.clientY
         }
-        window.addEventListener("mousemove", handleMouseMove)
+        window.addEventListener("pointermove", handleMouseMove)
 
-        // do nothing if mouseup before timeout/significant mousemove
+        // do nothing if pointerup before timeout/significant pointermove
         const handleMouseUp = () => {
             cleanup()
         }
-        window.addEventListener("mouseup", handleMouseUp)
+        window.addEventListener("pointerup", handleMouseUp)
+        window.addEventListener("pointercancel", handleMouseUp)
 
-        // start dragging if mousedown for long enough
+        // start dragging if pointerdown for long enough
         const dragDelayTimer = setTimeout(() => {
             cleanup()
             this.handleDragSelectedCards(event, cardIdx)
@@ -68,7 +82,7 @@ export default class Draggable {
         const minDist = multipleSelected ? 40 : 20  // px
         let doubleChecked = false
 
-        // start dragging if mouse moves significantly
+        // start dragging if pointer moves significantly
         const moveInterval = setInterval(() => {
             const speed = Math.hypot(currentMouse.x-previousMouse.x, currentMouse.y-previousMouse.y) / (this.moveTimeout / 1000)  // px/s
             const dist  = Math.hypot(currentMouse.x-event.clientX, currentMouse.y-event.clientY)
@@ -87,8 +101,9 @@ export default class Draggable {
         const cleanup = () => {
             clearTimeout(dragDelayTimer)
             clearInterval(moveInterval)
-            window.removeEventListener("mouseup", handleMouseUp)
-            window.removeEventListener("mousemove", handleMouseMove)
+            window.removeEventListener("pointerup", handleMouseUp)
+            window.removeEventListener("pointercancel", handleMouseUp)
+            window.removeEventListener("pointermove", handleMouseMove)
         }
     }
     handleDragSelectedCards(e, cardIdx) {
@@ -106,13 +121,13 @@ export default class Draggable {
         this.selectedCardsIndices.sort((a, b) => a - b)
 
         const cardsRem = [...Array(this.playState.hand.length).keys()].filter(j => !this.selectedCardsIndices.includes(j))
-        const squish = this.getSquish(this.cardW)
+        const squish = isDeck && this.cardMarginDeck !== this.cardMargin
 
         this.dragee = document.body.appendChild(document.createElement('div'))
         // this.dragee.id = 'drag-hand-cards'
         this.dragee.classList.add('draggable', 'flex')
         if (isDeck) {
-            this.dragee.innerHTML = `<div class="fduCard fuCardB"><div class="fuCardInner"></div></div>`
+            this.dragee.innerHTML = `<div class="fduCard fuCardB" style="margin: ${this.cardMarginDeck}px; z-index: 10"><div class="fuCardInner"></div></div>`
         }
         else {
             for (let idx of this.selectedCardsIndices) {
@@ -130,7 +145,7 @@ export default class Draggable {
                 if (this.selectedCardsIndices.length === 1) {
                     this.currentPlayerNode = $(`oppHand-${this.playState.currentPlayer.playerId}`)
                     this.currentPlayerNode.classList.add('dropZone')
-                    this.currentPlayerNode.style.padding = '40px'
+                    // this.currentPlayerNode.style.padding = '40px'
                 }
             }
             else {
@@ -139,54 +154,22 @@ export default class Draggable {
         }
 
         this.addListeners({
-            'mousemove': e => this.handleCardMouseMove(e, cardsRem, squish),
-            'mouseup': e => this.handleCardMouseUp(e, cardsRem, isDeck),
+            'pointermove': e => this.handleCardMouseMove(e, cardsRem, squish),
+            'pointerup': e => this.handleCardMouseUp(e, cardsRem, isDeck),
+            'pointercancel': e => this.handleCardMouseUp(e, cardsRem, isDeck),
             'keyup': e => this.handleEscKeyUp(e),
         })
     }
-    getSquish(cardW) {
-        const handLen = this.playState.hand.length
-
-        if (cardW * handLen > $('playerHand').offsetWidth) {
-            const winW = window.innerWidth - (5*2)  // 2 x player hand margin 5px (beware magic number!)
-            const minMargin = 5, maxCardP = 15, maxCardW = 75  // hardcoded css values???
-            const cardW = winW / handLen
-            let minMarginCardWidth = (2*minMargin) + (2*maxCardP) + maxCardW
-            if (minMarginCardWidth * handLen < winW) {
-                const margin = Math.floor(minMargin + ((cardW - minMarginCardWidth) / 2))
-                return margin < 10 ? { margin: margin + 'px' } : {}  // 10px here being normal card margin
-            }
-            else {
-                const innerW  = Math.floor((cardW - (2*minMargin)) * maxCardW/((2*maxCardP)+maxCardW))
-                const padding = Math.floor((cardW - (2*minMargin)) * maxCardP/((2*maxCardP)+maxCardW))
-                const fontSize = 16 * innerW/maxCardW //  hardcoded css values???
-                return {
-                    width: innerW + 'px',
-                    height: Math.floor(4 * innerW / 3) + 'px',
-                    padding: padding + 'px',
-                    margin: minMargin + 'px',
-                    fontSize: fontSize + 'px',
-                }
-            }
-        }
-    }
-    applySquish(squish) {
-        $(this.renderNodeId).classList.add('squish')
+    applySquish() {
+        this.squishing = true
         $$$('.fuCard').forEach(c => {
-            if (squish.margin) {c.style.marginLeft = squish.margin;  c.style.marginRight = squish.margin}
-            if (Object.keys(squish).length > 1) {
-                c.style.paddingLeft = squish.padding;  c.style.paddingRight = squish.padding
-                c.firstElementChild.style.width = squish.width; c.firstElementChild.style.height = squish.height
-                c.firstElementChild.style.fontSize = squish.fontSize
-            }
+            c.style.margin = this.cardMarginDeck + 'px'
         })
     }
     removeSquish() {
-        $(this.renderNodeId).classList.remove('squish')
+        this.squishing = false
         $$$('.fuCard').forEach(c => {
-            for (let k of ['margin-left', 'margin-right', 'padding-left', 'padding-right', 'width', 'height', 'font-size']) {
-                c.style.removeProperty(k)
-            }
+            c.style.margin = this.cardMargin + 'px'
         })
     }
     findDropZoneUnderPoint(x, y) {
@@ -215,8 +198,8 @@ export default class Draggable {
                     const ghost = document.body.appendChild(document.createElement('div'))
                     ghost.classList.add('flex')
                     ghost.id = this.ghostId
-                    ghost.innerHTML = `<div class="fuCard"><div class="fuCardInner"></div></div>`.repeat(this.selectedCardsIndices.length || 1)
-                    if (squish) { this.applySquish(squish) }
+                    ghost.innerHTML = `<div class="fuCard" style="margin: ${this.cardMargin}px"><div class="fuCardInner"></div></div>`.repeat(this.selectedCardsIndices.length || 1)
+                    if (squish) { this.applySquish() }
                 }
             }
             if (this.currentDropZone) {
@@ -264,7 +247,10 @@ export default class Draggable {
                     action: "pick",
                     insertPos: this.cardsOnLeftQty,
                     ...this.playState.apiParams()
-                }).catch(alert)
+                }).catch(err => {
+                    alert(`error picking from deck: ${err}`)
+                    this.playState.forceRerender()
+                })
             }
             else {
                 cardsRem.splice(this.cardsOnLeftQty, 0, ...this.selectedCardsIndices)
@@ -328,6 +314,8 @@ export default class Draggable {
     }
     endDrag() {
         this.dragee.remove()
+        this.dragee = null
+        this.squishing = false
         this.currentDropZone?.classList.remove('dropZoneHover')
         this.currentDropZone = null
         this.cardsOnLeftQty = null
