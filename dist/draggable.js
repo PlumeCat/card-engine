@@ -249,7 +249,7 @@ export default class Draggable {
                     ...this.playState.apiParams()
                 }).catch(err => {
                     alert(`error picking from deck: ${err}`)
-                    this.playState.forceRerender()
+                    this.match.updatePlayerHand(true)
                 })
             }
             else {
@@ -266,8 +266,8 @@ export default class Draggable {
                     }).then(() => {
                         this.selectedCardsIndices = newSelection
                     }).catch(err => {
-                        alert(`error while arranging cards: ${err}`)  // todo need to handle this properly. revert back to previous hand order. force rerender for now
-                        this.playState.forceRerender()
+                        alert(`error while arranging cards: ${err}`)
+                        this.match.updatePlayerHand(true)
                     })
                 }
             }
@@ -288,7 +288,8 @@ export default class Draggable {
                 alert(err)
                 // this.cancelDragSelectedCards()  // todo this doesnt work, because dragee is already removed :(
                 // forcing a re-render, until the cancelDrag thing can work... unless a force rerender is actually fine?
-                this.playState.forceRerender()
+                this.match.updateDiscardPileAnim(true)
+                this.match.updatePlayerHand(true)
             })
         }
         else if (this.currentDropZone && (this.currentDropZone === this.currentPlayerNode)) {
@@ -303,7 +304,7 @@ export default class Draggable {
             }).catch(err => {
                 alert(err)
                 // this.cancelDragSelectedCards()
-                this.playState.forceRerender()
+                this.match.updatePlayerHand(true)
             })
         }
         else {
@@ -332,10 +333,15 @@ export default class Draggable {
             $('playerHand').insertBefore($(`${this.cardContId}${i}`), $$(`#playerHand #${this.cardContId}${i + 1}`) || null)
         }
     }
-    handleEscKeyUp(e) {
-        if (e.key === 'Escape') {
+    abort() {
+        if (this.dragee) {
             this.cancelDragSelectedCards()
             this.endDrag()
+        }
+    }
+    handleEscKeyUp(e) {
+        if (e.key === 'Escape') {
+            this.abort()
         }
     }
 }

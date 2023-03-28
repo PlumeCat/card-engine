@@ -44,7 +44,7 @@ document.body.addEventListener('touchmove', preventDefault, { passive: false });
 
 
 class PlayState {
-    constructor(params) {
+    constructor(params, renderCallback, prev=true) {
         const { playerId, playerName, gameId } = params
         this.playerId = playerId
         this.playerName = playerName
@@ -52,10 +52,16 @@ class PlayState {
         this.game = {
             matchState: MatchState.WAITING,
             players: [],
+            playerTurn: 0,
             hands: [],
+            discard: [],
+            remainder: [],
             attackedId: null,
-            winner: ""
+            winner: "",
+            _init: true
         }
+        this.renderCallback = renderCallback
+        this.prev = prev ? new PlayState(params, ()=>{}, false) : null
     }
     get player() {
         return this.getPlayer(this.playerId)
@@ -69,6 +75,9 @@ class PlayState {
     get hand() {
         return this.game.hands[this.player.handIndex] || []
     }
+    get matchState() {
+        return this.game.matchState
+    }
     get turnState() {
         return this.game.turnState
     }
@@ -76,15 +85,37 @@ class PlayState {
         // query state
         apiGet("/state", { gameId: this.gameId })
             .then(newState => {
-                if (newState && !compareState(this.game, newState)) {
-                    if (newState.turnState !== this.turnState && this.game.matchState === MatchState.PLAYING) {
-                        this.prevTurnStateMsg = getTurnStateMsg(this)
-                    }
-                    this.handleAttackTurn(newState)
-                    this.game = newState
-                    render()
-                }
+                this.handleChanges(newState)
             }).catch(console.error)
+    }
+    handleChanges(newState) {
+        if (newState.turnState !== this.game.turnState && this.matchState === MatchState.PLAYING) {
+            this.prevTurnStateMsg = getTurnStateMsg(this)
+        }
+        this.handleAttackTurn(newState)
+
+        this.prev.game = this.game
+        this.game = newState
+        this.renderCallback()
+    }
+    prevStateDiffers(propList, playerId) {
+        if (this.prev.game._init) return true;
+        if (this.matchState !== this.prev.matchState) return true
+
+        for (let prop of propList) {
+            let curr, prev;
+            if (this[prop] && playerId!==undefined) {
+                curr = this[prop](playerId); prev = this.prev[prop]?.(playerId)
+            }
+            else if (this[prop] && playerId===undefined) {
+                curr = this[prop]; prev = this.prev[prop]
+            }
+            else if (this.game[prop]) {
+                curr = this.game[prop]; prev = this.prev.game[prop]
+            }
+            if (!_isObjEqual(curr, prev)) return true
+        }
+        return false
     }
     handleAttackTurn(newState) {
         if (newState.attackedId !== this.game.attackedId) {
@@ -103,6 +134,9 @@ class PlayState {
             return player
         }
         return this.game.players.find(p => p.playerId === player)
+    }
+    getOtherPlayerIds() {
+        return this.game.players.map(p => p.playerId).filter(p => p!== this.playerId)
     }
     getNthPlayer(n) {
         return this.game.players[(this.game.players.findIndex(p => p.playerId === this.playerId) + n) % 4]
@@ -182,7 +216,7 @@ class MenuScreen extends GameScreen {
 class MatchScreen extends GameScreen {
     constructor(params) {
         super()
-        this.playState = new PlayState(params)
+        this.playState = new PlayState(params, this.renderChanges.bind(this))
 
         this.timeout = 500
         this.renderNodeId = 'matchFloor'
@@ -192,7 +226,7 @@ class MatchScreen extends GameScreen {
         this.resizeHandler = () => { const margin = this.cardMargin+'px'; $$$('.fuCard').forEach(c => {c.style.margin = margin}) }
     }
     get matchState() {
-        return this.playState.game.matchState
+        return this.playState.matchState
     }
     onEnter() {
         this.interval = setInterval(this.playState.getState.bind(this.playState), this.timeout)
@@ -211,11 +245,32 @@ class MatchScreen extends GameScreen {
     get cardMargin() {
         return this.getCardMargin(this.playState.hand.length)
     }
+    renderChanges() {
+        if (this.matchState !== MatchState.PLAYING) {
+            render()
+            return
+        }
+
+        document.body.classList[this.playState.showModal() ? 'add' : 'remove']('showModal')
+
+        if (this.matchState !== this.playState.prev.matchState) {
+            render()
+        }
+
+        for (let playerId of this.playState.getOtherPlayerIds()) {
+            this.updateOppHand(playerId)
+            this.updateOppHandAnim(playerId)
+        }
+
+        this.updateDiscardPileAnim()
+        this.updateRemPile()
+        this.updatePlayInfo()
+        this.updatePlayerHand()
+        this.updateModal()
+    }
     onRender() {
         const { playerId, playerName, gameId } = this.playState
         if (this.matchState === MatchState.PLAYING) {
-            // todo ?? found the below bug by chance. need to examine all the ways in which player's hand may be changed
-            this.selectedCardsIndices = this.selectedCardsIndices.filter(i => i < this.playState.hand.length)
             return this.renderMatchPlay()
         } else if (this.matchState === MatchState.WAITING) {
             return `<div class="initialScreen"><h2>${playerName} (${playerId}) (${gameId})</h2><p>Waiting for 4 players...</p></div>`
@@ -227,18 +282,15 @@ class MatchScreen extends GameScreen {
     }
     renderMatchPlay() {
         const { playerId, playerName, gameId } = this.playState
-        document.body.classList[this.playState.showModal() ? 'add' : 'remove']('showModal')
         return `
             <div id="matchPlayCont">
                 <div id="matchPlayersTop">${this.renderOppHand('top')}</div>
                 <div id="matchPlayBottom">
                     <div id="matchPlayersLeft">${this.renderOppHand('left')}</div>
                     <div id="matchPlayArea">
-                        <div id="matchPilesCont">
-                            ${this.renderMatchPiles()}
-                        </div>
+                        <div id="matchPilesCont">${this.renderMatchPiles()}</div>
                         <div id="matchPlayAreaAligner"></div>
-                        ${this.renderPlayInfo()}
+                        <div id="playInfo"></div>
                     </div>
                     <div id="matchPlayersRight">${this.renderOppHand('right')}</div>
                 </div>
@@ -246,17 +298,22 @@ class MatchScreen extends GameScreen {
             <div id='playerSection'>                    
                 <div id='playerHandCont'>
                     <div class="playerHandAligner"></div>
-                    <div id='playerHand' class="dropZone">
-                        ${this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")}
-                    </div>
+                    <div id='playerHand' class="dropZone"></div>
                     <div class="playerHandAligner"></div>
                 </div>
                 <div id="playerHandActionsCont">
                     <div class="playerInfo">${playerName} (${playerId}) (${gameId})</div>
                 </div>
             </div>
-            ${this.playState.showModal() ? renderModal(this.playState) : ''}
+            <div id="matchModal"></div>
         `
+    }
+    updateModal() {
+        if (!this.playState.prevStateDiffers(['showModal'], this.playState.playerId)) {
+            return
+        }
+        $('matchModal').innerHTML = this.playState.showModal() ? renderModal(this.playState) : ''
+        this.bindModalEvents()
     }
     calcDiscardPositions(posLength, size) {
         const refEl = $$('#matchDiscardPile .fuCardB')  // one of these should always exist in the dom
@@ -290,11 +347,18 @@ class MatchScreen extends GameScreen {
         })
     }
     adjustMatchDiscardPile() {
-        const len = $('matchDiscardPile').children.length
-        const sizes = this.calcDiscardPositions(len, true)
-        const size = sizes[len-1]
-        $('matchDiscardPile').style.width = `${size.width}px`
-        $('matchDiscardPile').style.height = `${size.height}px`
+        const el = $('matchDiscardPile')
+        const len = el.children.length
+        if (len > 1) {
+            const sizes = this.calcDiscardPositions(len, true)
+            const size = sizes[len - 1]
+            el.style.width = `${size.width}px`
+            el.style.height = `${size.height}px`
+        }
+        else {
+            el.style.removeProperty('width')
+            el.style.removeProperty('height')
+        }
     }
     renderDiscardPileTop(cards) {
         const { game } = this.playState
@@ -325,12 +389,7 @@ class MatchScreen extends GameScreen {
     }
     renderMatchPiles() {
         const { game } = this.playState
-        const remainderCount = game.remainder.length <= 10 ? game.remainder.length
-                             : game.remainder.length < 15 ? '10+'
-                             : game.remainder.length < 20 ? '15+'
-                             : '?'
-        const ts = this.playState.turnState
-        const discard = [`
+        const discardStack = `
             <div class="matchCardStackCont" id="matchDiscardStack">
                 <span>Discard</span>
                 <hr>
@@ -338,16 +397,8 @@ class MatchScreen extends GameScreen {
                     ${game.discard.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
                 </div>
             </div>
-        `, `
-            <div class="matchCardPileCont" id="matchDiscardPile">
-                ${game.discard.length ? 
-                    this.renderDiscardPileTop((ComboTurnStates.includes(ts) && game.discard[0].value !== Cards.NOPE.value) ? parseInt(ts[ts.search(/COMBO/)+5]) : 1)
-                  : `
-                    <div class="fuCardB invis"><div class="fuCardInner"></div></div>
-                `}
-            </div>
-        `]
-        const remainder = [`
+        `
+        const remainderStack = `
             <div class="matchCardStackCont" id="matchRemStack">
                 <span>Deck</span>
                 <hr>
@@ -355,45 +406,71 @@ class MatchScreen extends GameScreen {
                     ${game.remainder.reduce((v, c) => v + `<p>${c.name}</p>`, "")}
                 </div>
             </div>
-        `, `
+        `
+
+        const discardPile = `<div class="matchCardPileCont" id="matchDiscardPile"></div>`
+        const remainderPile = `
             <div class="matchCardPileCont" id="matchRemPile">
-            ${this.playState.turnState === TurnStates.DEFUSING ? 
-                `<div class="fuCardB fuCard${getShortCardName(Cards.BOMB)}">${getCardInnerHtml(Cards.BOMB)}</div>` :
-                `<div class="fduCard fuCardB${this.validToPickCard() ? ' enabled' : ''}" id="matchRemPileTopCard"><div class="fuCardInner">${remainderCount}</div></div>`
-            }
+                <div class="fduCard fuCardB${this.validToPickCard() ? ' enabled' : ''}" id="matchRemPileTopCard">
+                    <div class="fuCardInner" id="matchRemPileTopCardInner"></div>
+                </div>
             </div>
-        `]
-        const actions = [`
-            <div id="matchPlayAreaActions">
-                <button id="pick-button">pick</button>
-            </div>
-        `, '']
+        `
 
         return `
             <div id="matchStacks" class="${this.debugPiles ? '' : 'hidden'}">
-                ${discard[0]}
-                ${remainder[0]}
-                ${actions[0]}
+                ${discardStack}
+                ${remainderStack}
             </div>
             <div id="matchPiles" class="${this.debugPiles ? 'hidden' : ''}">
-                ${discard[1]}
-                ${remainder[1]}
-                ${actions[1]}
+                ${discardPile}
+                ${remainderPile}
             </div>
         `
     }
-    renderPlayInfo() {
-        return `
-            <div id="playInfo">
-                <div>
-                    ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
-                    ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
-                </div>
-                <div>
-                    ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
-                </div>
+    updateDiscardPileAnim(force) {
+        // ANIM: ? -> PLAYING_X (!isYourTurn)
+        if (!force && !this.playState.prevStateDiffers(['discard', 'turnState'])) {
+            return
+        }
+        const discard = this.playState.game.discard
+        const ts = this.playState.turnState
+        $('matchDiscardPile').innerHTML = discard.length ?
+            this.renderDiscardPileTop((ComboTurnStates.includes(ts) && discard[0].value !== Cards.NOPE.value) ? parseInt(ts[ts.search(/COMBO/)+5]) : 1)
+          : `
+            <div class="fuCardB invis"><div class="fuCardInner"></div></div>
+        `
+        this.adjustMatchDiscardPile()
+    }
+    updateRemPile() {
+        if (!this.playState.prevStateDiffers(['remainder'])) {
+            return
+        }
+        const len = this.playState.game.remainder.length
+        $('matchRemPileTopCardInner').innerHTML = len <= 10 ? len.toString() : len < 15 ? '10+' : len < 20 ? '15+' : '?'
+    }
+    updatePlayInfo() {
+        if (!this.playState.prevStateDiffers(['playerTurn', 'attackedId', 'turnState'])) {
+            return
+        }
+        $('playInfo').innerHTML = `
+            <div>
+                ${this.playState.isYourTurn() ? '<b>your</b>' : `<b>${this.playState.currentPlayer.playerName}</b>'s`} turn...${this.playState.attackedTurn ? ` (${this.playState.attackedTurn}/2)` : ''}
+                ${this.playState.player.alive ? "" : "YOU ARE DEAD!"}
+            </div>
+            <div>
+                ${this.playState.showModal() ? '' : getTurnStateMsg(this.playState)}                
             </div>
         `
+    }
+    updatePlayerHand(force) {
+        if (!force && !this.playState.prevStateDiffers(['hand'])) {
+            return
+        }
+        this.draggable.abort()
+        this.selectedCardsIndices = this.selectedCardsIndices.filter(i => i < this.playState.hand.length)
+        $('playerHand').innerHTML = this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")
+        this.bindPlayerHandEvents()
     }
     renderCard(c, i) {
         return `
@@ -407,19 +484,32 @@ class MatchScreen extends GameScreen {
     renderOppHand(pos) {
         const n = {left: 1, top: 2, right: 3}[pos]
         const player = this.playState.getNthPlayer(n)
-        const alive = this.playState.playerAlive(player)
-        const len = this.playState.playerCardCount(player)
-        const classes = [
-            'oppHandCont',
-            (this.playState.chooseOppEnabled() && this.playState.playerAvailable(player)) ? 'enabled' : '',
-            !alive ? 'dead' : '',
-        ].filter(c => c).join(' ')
         return `
-            <div class="${classes}" id="oppHand-${player.playerId}">
-                <div class="fdCard fdCardOpp">${alive ? len : ''}</div>
+            <div class="oppHandCont" id="oppHand-${player.playerId}">
+                <div class="fdCard fdCardOpp" id="oppHandInner-${player.playerId}"></div>
                 <div class="oppPlayerInfo">${player.playerName}</div>
             </div>
         `
+    }
+    updateOppHand(playerId) {
+        if (!this.playState.prevStateDiffers(['playerAlive', 'chooseOppEnabled', 'playerAvailable'], playerId)) {
+            return
+        }
+        const dead = !this.playState.playerAlive(playerId)
+        const enabled = (this.playState.chooseOppEnabled() && this.playState.playerAvailable(playerId))
+        const el = $(`oppHand-${playerId}`)
+        el.classList[enabled ? 'add':'remove']('enabled')
+        el.classList[dead ? 'add':'remove']('dead')
+        dead && ($(`oppHandInner-${playerId}`).innerHTML = '')
+    }
+    updateOppHandAnim(playerId) {
+        // ANIM: ? -> PICKED (!isYourTurn)
+        // ANIM: START -> PLAYING_X (!isYourTurn)
+        if (!this.playState.prevStateDiffers(['playerCardCount'], playerId)) {
+            return
+        }
+        const len = this.playState.playerCardCount(playerId)
+        $(`oppHandInner-${playerId}`).innerHTML = len.toString()
     }
     renderMatch() {
         return `
@@ -447,121 +537,32 @@ class MatchScreen extends GameScreen {
             return this.selectedCardsIndices.length === 1 && this.playState.hand[this.selectedCardsIndices[0]].name === Cards.NOPE.name
         }
     }
-    buttonIsDisabled(id) {
-        return false  // todo enable front end validation when ready
-        if (id === 'give-button') {
-            return this.selectedCardsIndices.length !== 1
-        }
-        if (id === 'play-button') {
-            return !this.validateCardsForPlay()
-        }
-    }
-    bindEvents() {
-        const { game, playerId } = this.playState
-
-        if (this.matchState === MatchState.PLAYING) {
-            $('matchPlayCont').addEventListener("click", e => {
-                let el = e.target
-                while (el) {
-                    if (el.classList && el.classList.contains('enabled')) {
-                        return
-                    }
-                    el = el.parentNode
+    bindPlayerHandEvents() {
+        // player selects/drags their cards when clicked
+        for (let i = 0; i < this.playState.hand.length; i++) {
+            $(`hand-card-${i}`).addEventListener("click", (e) => {
+                if (this.selectedCardsIndices.includes(i)) {
+                    this.selectedCardsIndices = this.selectedCardsIndices.filter(c => c!== i)
+                    $(`hand-card-${i}`).classList.remove('fuCardSelected')
                 }
-                this.deselectCardsInHand()
+                else {
+                    if (this.playState.isGivingFavour()) {
+                        this.deselectCardsInHand()
+                    }
+                    this.selectedCardsIndices.push(i)
+                    $(`hand-card-${i}`).classList.add('fuCardSelected')
+                }
             })
-        }
-        if (this.matchState === MatchState.PLAYING && $('matchDiscardPile').children.length > 1) {
-            this.adjustMatchDiscardPile()
-        }
-
-        // player selects their cards when clicked
-        if (this.matchState === MatchState.PLAYING) {
-            for (let i = 0; i < this.playState.hand.length; i++) {
-                $(`hand-card-${i}`).addEventListener("click", (e) => {
-                    if (this.selectedCardsIndices.includes(i)) {
-                        this.selectedCardsIndices = this.selectedCardsIndices.filter(c => c!== i)
-                        $(`hand-card-${i}`).classList.remove('fuCardSelected')
-                    }
-                    else {
-                        if (this.playState.isGivingFavour()) {
-                            this.deselectCardsInHand()
-                        }
-                        this.selectedCardsIndices.push(i)
-                        $(`hand-card-${i}`).classList.add('fuCardSelected')
-                    }
-                    document.querySelectorAll('#playerHandActions button').forEach(b => {b.disabled = this.buttonIsDisabled(b.id)})
-                })
-                $(`hand-card-${i}`).addEventListener("pointerdown", (e) => {
-                    // todo keep cards pointermove-ing if re-render
-                    if (e.button !== 0) {
-                        return
-                    }
-                    this.draggable.initiateDragSelectedCards(e, i)
-                })
-            }
-        }
-
-        // check whether to disable any buttons
-        document.querySelectorAll('button').forEach(b => b.disabled = this.buttonIsDisabled(b.id))
-
-        $("pick-button")?.addEventListener("click", e => {
-            apiPost("/action", {
-                action: "pick",
-                ...this.playState.apiParams()
-            }).catch(alert)
-        })
-        $$("#matchRemPileTopCard.enabled")?.addEventListener("pointerdown", e => {  // should only be enabled if validation passed
-            if (e.button !== 0) {
-                return
-            }
-            this.draggable.initiateDragSelectedCards(e, 'deck')
-        })
-
-        $("play-button")?.addEventListener("click", () => {
-            console.log("PLAY")
-            apiPost("/action", {
-                action: "play",
-                cardIndices: this.selectedCardsIndices,
-                ...this.playState.apiParams()
-            }).then(() => {
-                this.deselectCardsInHand()
-            }).catch(alert)
-        })
-
-        $("restart-button")?.addEventListener("click", () => {
-            console.log("RESTART")
-            apiPost("/action", { action: "restart", ...this.playState.apiParams() }).catch(alert)
-        })
-
-        $("exit-button")?.addEventListener("click", () => {
-            console.log("EXIT")
-            apiGet("/leave", { ...this.playState.apiParams() }).catch(alert)
-            setScreen(new MenuScreen())
-        })
-
-        $("nope-button")?.addEventListener("click", () => {
-            console.log("NOEP")
-            apiPost("/action", { playerId, action: "nope" }).catch(alert)
-        })
-
-        // handle clicking on a player
-        if (game.matchState === MatchState.PLAYING && this.playState.chooseOppEnabled()) {
-            game.players.forEach(p => {
-                if (p.playerId === playerId || !this.playState.playerAvailable(p)) {
+            // todo if players cards are being fanned out or combo3'd then cancel and disable drag
+            $(`hand-card-${i}`).addEventListener("pointerdown", (e) => {
+                if (e.button !== 0) {
                     return
                 }
-                $(`oppHand-${p.playerId}`).addEventListener('click', () => {
-                    console.log('CLICKED PLAYER', p.playerName, p.playerId)
-                    apiPost("/action", {
-                        action: "clicked-player",
-                        targetPlayerId: p.playerId,
-                        ...this.playState.apiParams()
-                    }).catch(alert)
-                })
+                this.draggable.initiateDragSelectedCards(e, i)
             })
         }
-
+    }
+    bindModalEvents() {
         // handle clicking on other player's fanned out cards (combo2)
         document.querySelectorAll('#combo2OppHand .fdCard').forEach(c => {
             const index = parseInt(c.id.split('-').pop())
@@ -601,22 +602,6 @@ class MatchScreen extends GameScreen {
             })
         })
 
-        // handle giving a selected card (favour)
-        $("give-button")?.addEventListener("click", () => {
-            console.log("PLAY")
-            if (this.selectedCardsIndices.length != 1) {
-                alert("select 1 card to give")
-                return
-            }
-            apiPost("/action", {
-                action: "clicked-card",
-                targetCardIndex: this.selectedCardsIndices[0],
-                ...this.playState.apiParams()
-            }).then(() => {
-                this.deselectCardsInHand()
-            }).catch(alert)
-        })
-
         // handle reinserting a card (defusing)
         document.querySelectorAll('#defusingRemPile .defusingRemPick').forEach(c => {
             const index = parseInt(c.id.split('-').pop())
@@ -628,6 +613,55 @@ class MatchScreen extends GameScreen {
                 }).catch(alert)
             })
         })
+    }
+    bindEvents() {
+        const { game, playerId } = this.playState
+
+        if (this.matchState === MatchState.PLAYING) {
+            $('matchPlayCont').addEventListener("click", e => {
+                let el = e.target
+                while (el) {
+                    if (el.classList && el.classList.contains('enabled')) {
+                        return
+                    }
+                    el = el.parentNode
+                }
+                this.deselectCardsInHand()
+            })
+
+            $$("#matchRemPileTopCard.enabled")?.addEventListener("pointerdown", e => {  // should only be enabled if validation passed
+                if (e.button !== 0) {
+                    return
+                }
+                this.draggable.initiateDragSelectedCards(e, 'deck')
+            })
+
+            // handle clicking on a player
+            game.players.forEach(p => {
+                if (p.playerId === playerId ) return
+
+                $(`oppHand-${p.playerId}`).addEventListener('click', () => {
+                    if(this.playState.chooseOppEnabled() && this.playState.playerAvailable(p)) {
+                        console.log('CLICKED PLAYER', p.playerName, p.playerId)
+                        apiPost("/action", {
+                            action: "clicked-player",
+                            targetPlayerId: p.playerId,
+                            ...this.playState.apiParams()
+                        }).catch(alert)
+                    }
+                })
+            })
+        }
+
+        $("restart-button")?.addEventListener("click", () => {
+            console.log("RESTART")
+            apiPost("/action", { action: "restart", ...this.playState.apiParams() }).catch(alert)
+        })
+        $("exit-button")?.addEventListener("click", () => {
+            console.log("EXIT")
+            apiGet("/leave", { ...this.playState.apiParams() }).catch(alert)
+            setScreen(new MenuScreen())
+        })
 
         // handle debug piles checkbox
         $('debugPilesCheck')?.addEventListener('change', e => {
@@ -635,7 +669,6 @@ class MatchScreen extends GameScreen {
                 this.debugPiles = e.target.checked
                 $(this.debugPiles ? 'matchPiles': 'matchStacks').classList.add('hidden')
                 $(this.debugPiles ? 'matchStacks': 'matchPiles').classList.remove('hidden')
-                $('playerHandActions').classList[this.debugPiles ? 'remove' : 'add']('hidden')
             }
         })
     }

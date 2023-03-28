@@ -69,6 +69,12 @@ export const getTurnStateMsg = (state) => {
         return isPlayer ? 'seeing the future'
              : `${currentPlayer} is peeking at the top 3 cards...`
     }
+    if (turnState === TurnStates.SHUFFLING) {
+        return 'SHUFFLING...'
+    }
+    if (turnState === TurnStates.PICKED) {
+        return 'ending turn by picking a card'
+    }
     return ''
 }
 

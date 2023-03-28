@@ -5,7 +5,7 @@
 import express from "express"
 import cors from "cors"
 import { dealCards } from "./deck.js"
-import { TurnStateHandlers, MatchState, checkNope } from "./turn.js"
+import { TurnStateHandlers, TurnStateTimers, MatchState, checkNope } from "./turn.js"
 
 const log = console.log
 
@@ -35,10 +35,11 @@ const nextId = (() => {
         return _
     }
 })()
-const createPlayer = (playerName, ready = false) => ({
+const createPlayer = (playerName, handIndex) => ({
     playerId: nextId(),
     playerName,
-    ready,
+    handIndex,
+    ready: false,
     alive: true
 })
 
@@ -52,7 +53,8 @@ const createGame = () => {
         discard: [],
         remainder: [],
         attackedId: null,
-        turnState: "START"
+        turnState: "START",
+        pickedCard: null,
     }
 
     // deal cards
@@ -79,7 +81,7 @@ app.get("/create-game", (req, res) => {
     
     // create a new game, add to active games
     games[gameId] = createGame()
-    games[gameId].players.push(createPlayer(playerName))
+    games[gameId].players.push(createPlayer(playerName, 0))
 
     // the calling player joins immediately
     return res.status(200).send({
@@ -105,13 +107,12 @@ app.get("/join", (req, res) => {
     }
     
     const playerName = req.query["playerName"] || `player ${game.players.length + 1}`
-    game.players.push(createPlayer(playerName))
+    game.players.push(createPlayer(playerName, game.players.length))
     const playerId = game.players[game.players.length - 1].playerId
     log(`Player joined: ${playerName} ${playerId}`)
 
     if (game.players.length == 4) {
         game.matchState = MatchState.PLAYING
-        game.players.forEach((p, i) => {  p.handIndex = i })
     }
     return res.status(200).send({
         gameId: Object.keys(games)[0],
@@ -150,13 +151,14 @@ const onMatchAction = (params, game) => {
         if (checkNope(params, game)) {  // todo find a cleaner way of doing this
             params.action = "nope"
         }
-        log("Match action: ", params, " | ", game.turnState)
-        const newState = TurnStateHandlers[game.turnState](params, game)
+        const oldState = game.turnState
+        log("Match action: ", params, " | ", oldState)
+        const newState = TurnStateHandlers[oldState](params, game)
         if (newState === undefined) {
             return false
         }
-        log(`State: ${game.turnState} -> ${newState}`)
-        if (newState != game.turnState) {
+        log(`State: ${oldState} -> ${newState}`)
+        if (newState != oldState) {
             game.turnState = newState
             if (game.activeTimer) {
                 clearTimeout(game.activeTimer)
@@ -170,7 +172,7 @@ const onMatchAction = (params, game) => {
             // set the timer action
             game.activeTimer = setTimeout(() => {
                 onMatchAction({ action: "timer" }, game)
-            }, 3000)
+            }, TurnStateTimers[newState] || 3000)
         }
         return true
     } catch (ex) {
@@ -239,7 +241,7 @@ app.post("/action", (req, res) => {
 })
 
 app.get("/state", (req, res) => {
-    log("state")
+    // log("state")
     const gameId = req.query["gameId"]
     // const game = games[gameId]
     const game = Object.values(games)[0]

@@ -44,13 +44,15 @@ button[disabled] {
     bottom: 0;
     left: 0;
     z-index: 1071;
+    display: none;
     background-color: #000;
 }
 .modal-backdrop.fade {
     opacity: 0;
 }
 .modal-backdrop.show {
-    opacity: .7;
+    opacity: .8;
+    display: block;
 }
 
 

@@ -87,6 +87,7 @@ export const TurnStates = [
     "FAVOUR_RECEIVING",
     "SHUFFLING",
     "ATTACKING",
+    "PICKED",
     "DEFUSING",
     "END",
 
@@ -111,6 +112,12 @@ export const TurnStates = [
     return v
 }, {})
 
+export const TurnStateTimers = {
+    [TurnStates.PICKED] : 1000,
+    [TurnStates.SEE_FUTURE] : 5000,
+    [TurnStates.DEFUSING] : 5000,
+}
+
 export const TurnStateHandlers = {
     [TurnStates.START]: (params, game) => {
         const action = params.action
@@ -119,11 +126,12 @@ export const TurnStateHandlers = {
         }
         if (action == "play") {
             const playerIndex = game.players.findIndex(p => p.playerId == params.playerId)
-            const hand = game.hands[game.players[playerIndex].handIndex]
-            console.log(`PLAY: ${params.cardIndices}`)
             if (game.playerTurn != playerIndex) {
                 return
             }
+            const player = game.players[game.playerTurn]
+            const hand = game.hands[player.handIndex]
+            console.log(`PLAY: ${params.cardIndices}`)
             if (params.cardIndices.length == 1) {
                 // skip, future, attack, favour, shuffle
                 const card = hand[params.cardIndices[0]]
@@ -158,7 +166,7 @@ export const TurnStateHandlers = {
                 }
                 // discard cards
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
-                game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
+                game.hands[player.handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
                 return TurnStates.PLAYING_COMBO2
             } else if (params.cardIndices.length == 3) {
                 const cards = params.cardIndices.map(i => hand[i])
@@ -170,7 +178,7 @@ export const TurnStateHandlers = {
                 }
                 // discard cards
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
-                game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
+                game.hands[player.handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
                 return TurnStates.PLAYING_COMBO3
             } else if (params.cardIndices.length == 5) {
                 const cards = params.cardIndices.map(i => hand[i])
@@ -182,7 +190,7 @@ export const TurnStateHandlers = {
                 }
 
                 params.cardIndices.forEach(i => game.discard.unshift(hand[i]))
-                game.hands[game.players[playerIndex].handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
+                game.hands[player.handIndex] = hand.filter((c, i) => !params.cardIndices.includes(i))
                 return TurnStates.PLAYING_COMBO5
             }
         } else if (action == "pick") {
@@ -190,9 +198,24 @@ export const TurnStateHandlers = {
             if (game.playerTurn != playerIndex) {
                 return
             }
-            const hand = game.hands[game.players[playerIndex].handIndex]
+            const player = game.players[game.playerTurn]
+            const hand = game.hands[player.handIndex]
             const card = game.remainder.shift()
+            game.pickedCard = card
             console.log(`PICK: ${card.name}`)
+            hand.splice(params.insertPos ?? hand.length, 0, card)
+            return TurnStates.PICKED
+        }
+    },
+
+    [TurnStates.PICKED]: (params, game) => {
+        const action = params.action
+
+        if (action == "timer") {
+            const player = game.players[game.playerTurn]
+            const hand = game.hands[player.handIndex]
+            const card = game.pickedCard
+
             if (card == Cards.BOMB) {
                 const defusePos = hand.indexOf(Cards.DEFUSE)
                 if (defusePos != -1) {
@@ -200,8 +223,8 @@ export const TurnStateHandlers = {
                     game.discard.unshift(Cards.DEFUSE)
                     return TurnStates.DEFUSING
                 } else {
-                    game.discard.unshift(Cards.BOMB)
-                    game.players[playerIndex].alive = false
+                    // game.discard.unshift(Cards.BOMB)
+                    player.alive = false
 
                     // check for a winner here
                     console.log("checking for winner")
@@ -214,7 +237,6 @@ export const TurnStateHandlers = {
                     return TurnStates.END
                 }
             } else {
-                hand.splice(params.insertPos ?? hand.length, 0, card)
                 return TurnStates.END
             }
         }
@@ -356,7 +378,7 @@ export const TurnStateHandlers = {
     },
     [TurnStates.SHUFFLING]: (params, game) => {
         const action = params.action
-        if (action == "immediate") {
+        if (action == "timer") {
             game.remainder = shuffle(game.remainder)
             return TurnStates.START
         }
@@ -371,15 +393,22 @@ export const TurnStateHandlers = {
         }
     },    
     [TurnStates.DEFUSING]: (params, game) => {
+        const removeBombFromHand = () => {
+            const hand = game.hands[game.players[game.playerTurn].handIndex]
+            const bombPos  = hand.indexOf(Cards.BOMB)
+            bombPos !== -1 && hand.splice(bombPos, 1)
+        }
         const action = params.action
         if (action == "timer") {
             // MUST push a bomb - if player times out, insert randomly
             const pos = Math.floor(Math.random() * game.remainder.length)
             console.log(`Reinserted bomb at ${pos}`)
             game.remainder.splice(pos, 0, Cards.BOMB)
+            removeBombFromHand()
             return TurnStates.END
         } else if (action == "submit-slider") {
             game.remainder.splice(params.insertPos, 0, Cards.BOMB)
+            removeBombFromHand()
             return TurnStates.END
         }
     },

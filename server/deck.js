@@ -54,5 +54,5 @@ export const dealCards = () => {
     // shuffle the remainder again
     const remainder = shuffle([ ...deck, Cards.BOMB, Cards.BOMB, Cards.BOMB ])
 
-    return [ hands, remainder ]
+    return [ hands.map(hand => shuffle(hand)), remainder ]
 }
