@@ -23,6 +23,26 @@ export const ComboTurnStates = [
     TurnStates.COMBO5_RECLAIMING,
 ]
 
+export const UntimedTurnStates = [
+    TurnStates.START,
+    TurnStates.PLAYING_FAVOUR,
+    TurnStates.PLAYING_COMBO2,
+    TurnStates.PLAYING_COMBO3,
+    TurnStates.COMBO2_STEALING,
+    TurnStates.COMBO3_NOMINATING,
+    TurnStates.COMBO5_RECLAIMING,
+    TurnStates.FAVOUR_RECEIVING,
+    TurnStates.SHUFFLING,
+    TurnStates.ATTACKING,
+    TurnStates.POST_COMBO2,
+    TurnStates.POST_COMBO3,
+    TurnStates.POST_COMBO5,
+    TurnStates.POST_FAVOUR,
+    TurnStates.PICKED,
+    TurnStates.BOMBED,
+    TurnStates.END,
+]
+
 export const getTurnStateMsg = (state) => {
     const bold = b => `<b>${b}</b>`
     const currentPlayer = bold(state.currentPlayer.playerName)
@@ -74,7 +94,8 @@ export const getTurnStateMsg = (state) => {
     }
     if (turnState === TurnStates.POST_COMBO3) {
         const card =  state.game.nominatedCard
-        return card.targetHas ? `${currentPlayer} requested ${bold(card.card.name)}` : `whoops... ${targetPlayer} does not have a ${bold(card.card.name)} :(`
+        const name = card.card.name
+        return card.targetHas ? `${currentPlayer} requested ${bold(name)}` : `whoops... ${targetPlayer} does not have a${name.startsWith('A')?'n':''} ${bold(name)} :(`
     }
     if (turnState === TurnStates.POST_COMBO5) {
         const card =  state.game.nominatedCard

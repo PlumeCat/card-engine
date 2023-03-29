@@ -56,6 +56,8 @@ const createGame = () => {
         turnState: "START",
         pickedCard: null,
         nominatedCard: {targetHas: false, card: null},
+        checkpoint: 0,
+        timer: 0,
     }
 
     // deal cards
@@ -171,6 +173,7 @@ const onMatchAction = (params, game) => {
                 onMatchAction({ action: "immediate" }, game)
             })
             // set the timer action
+            game.checkpoint = Date.now()
             game.activeTimer = setTimeout(() => {
                 onMatchAction({ action: "timer" }, game)
             }, TurnStateTimers[newState] || 3000)
@@ -254,6 +257,7 @@ app.get("/state", (req, res) => {
     // remove timer, serialize, put timer back
     const timer = game.activeTimer
     delete game.activeTimer
+    game.timer = Math.max(0, (TurnStateTimers[game.turnState] || 3000) - (Date.now() - game.checkpoint))
     res.status(200).send(game)
     game.activeTimer = timer
 })

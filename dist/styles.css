@@ -230,15 +230,15 @@ button[disabled] {
 .fuCardBEA .fuCardInner,
 .fuCardTAC .fuCardInner,
 .fuCardMEL .fuCardInner,
-.fuCardPOT .fuCardInner { background-color: #efefef; box-shadow: 0 0 3px 5px #e0e0e0; }
-.fuCardATT .fuCardInner { background-color: #f8ac93; box-shadow: 0 0 3px 5px #f15a25; }
-.fuCardSKI .fuCardInner { background-color: #8dc1e2; box-shadow: 0 0 3px 5px #1b83c6; }
-.fuCardFAV .fuCardInner { background-color: #959595; box-shadow: 0 0 3px 5px #2c2c2c; }
-.fuCardSHU .fuCardInner { background-color: #b9b1ab; box-shadow: 0 0 3px 5px #736458; }
-.fuCardNOP .fuCardInner { background-color: #cb888c; box-shadow: 0 0 3px 5px #971219; }
-.fuCardFUT .fuCardInner { background-color: #f68ebc; box-shadow: 0 0 3px 5px #ed1e7a; }
-.fuCardDEF .fuCardInner { background-color: #c5e29f; box-shadow: 0 0 3px 5px #8cc640; }
-.fuCardBOM .fuCardInner { background-color: #050505; box-shadow: 0 0 3px 5px #ef7529; }
+.fuCardPOT .fuCardInner { background-color: #efefef; color: #808080; box-shadow: 0 0 3px 5px #e0e0e0; }
+.fuCardATT .fuCardInner { background-color: #f8ac93; color: #f15a25; box-shadow: 0 0 3px 5px #f15a25; }
+.fuCardSKI .fuCardInner { background-color: #8dc1e2; color: #1b83c6; box-shadow: 0 0 3px 5px #1b83c6; }
+.fuCardFAV .fuCardInner { background-color: #959595; color: #2c2c2c; box-shadow: 0 0 3px 5px #2c2c2c; }
+.fuCardSHU .fuCardInner { background-color: #b9b1ab; color: #736458; box-shadow: 0 0 3px 5px #736458; }
+.fuCardNOP .fuCardInner { background-color: #cb888c; color: #971219; box-shadow: 0 0 3px 5px #971219; }
+.fuCardFUT .fuCardInner { background-color: #f68ebc; color: #ed1e7a; box-shadow: 0 0 3px 5px #ed1e7a; }
+.fuCardDEF .fuCardInner { background-color: #c5e29f; color: #79ae35; box-shadow: 0 0 3px 5px #8cc640; }
+.fuCardBOM .fuCardInner { background-color: #050505; color: #ef7529; box-shadow: 0 0 3px 5px #ef7529; }
 .fuCardBOM              { background-color: #050505; color: #ef7529; cursor: default; }
 
 .fdCard {
@@ -420,6 +420,24 @@ button[disabled] {
 #matchRemStack {
     background-color: #a30516;
     color: #efb429;
+}
+
+#timer {
+    z-index: 1500;
+    position: fixed;
+    top: 0;
+    left: 0;
+    font-size: 4rem;
+    margin: 2rem;
+    color: #ffffffd0;
+    background: #0000008f;
+    box-shadow: 0 0 13px 15px #0000008f;
+    width: 5rem;
+    height: 5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2.5rem;
 }
 
 /* ====== temp stuff for debug ====== */

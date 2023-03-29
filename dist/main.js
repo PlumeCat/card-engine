@@ -9,7 +9,7 @@ import renderModal from "/modals.js"
 import { TurnStates } from "/turn.js"
 import Draggable from "/draggable.js"
 import { $, $$, $$$ } from "/dollar.js"
-import { ChooseOppTurnStates, ModalTurnStates, ComboTurnStates, getTurnStateMsg } from "/turn_states.js"
+import { ChooseOppTurnStates, ModalTurnStates, ComboTurnStates, getTurnStateMsg, UntimedTurnStates } from "/turn_states.js"
 import { apiPost, apiGet } from "/api_client.js"
 
 const MatchState = {
@@ -274,6 +274,7 @@ class MatchScreen extends GameScreen {
         this.updateRemPile()
         this.updatePlayInfo()
         this.updateModal()
+        this.updateTimer()
     }
     onRender() {
         const { playerId, playerName, gameId } = this.playState
@@ -313,6 +314,7 @@ class MatchScreen extends GameScreen {
                 </div>
             </div>
             <div id="matchModal"></div>
+            <div id="timer"></div>
         `
     }
     updateModal() {
@@ -321,6 +323,12 @@ class MatchScreen extends GameScreen {
         }
         $('matchModal').innerHTML = this.playState.showModal() ? renderModal(this.playState) : ''
         this.bindModalEvents()
+    }
+    updateTimer() {
+        const el = $('timer')
+        const show = !UntimedTurnStates.includes(this.playState.turnState)
+        el.classList[show ? 'remove' : 'add']('hidden')
+        show && (el.innerHTML = Math.floor(this.playState.game.timer/1000).toString())
     }
     calcDiscardPositions(posLength, size) {
         const refEl = $$('#matchDiscardPile .fuCardB')  // one of these should always exist in the dom
