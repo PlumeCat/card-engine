@@ -72,8 +72,16 @@ export const getTurnStateMsg = (state) => {
     if (turnState === TurnStates.SHUFFLING) {
         return 'SHUFFLING...'
     }
-    if (turnState === TurnStates.PICKED) {
-        return 'ending turn by picking a card'
+    if (turnState === TurnStates.POST_COMBO3) {
+        const card =  state.game.nominatedCard
+        return card.targetHas ? `${currentPlayer} requested ${bold(card.card.name)}` : `whoops... ${targetPlayer} does not have a ${bold(card.card.name)} :(`
+    }
+    if (turnState === TurnStates.POST_COMBO5) {
+        const card =  state.game.nominatedCard
+        return `${currentPlayer} reclaimed a ${bold(card.card.name)}`
+    }
+    if (turnState === TurnStates.BOMBED) {
+        return `${currentPlayer} BLEW UP`
     }
     return ''
 }

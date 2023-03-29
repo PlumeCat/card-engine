@@ -55,6 +55,7 @@ const createGame = () => {
         attackedId: null,
         turnState: "START",
         pickedCard: null,
+        nominatedCard: {targetHas: false, card: null},
     }
 
     // deal cards

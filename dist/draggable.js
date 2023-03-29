@@ -249,7 +249,7 @@ export default class Draggable {
                     ...this.playState.apiParams()
                 }).catch(err => {
                     alert(`error picking from deck: ${err}`)
-                    this.match.updatePlayerHand(true)
+                    this.match.updatePlayerHandAnim(true)
                 })
             }
             else {
@@ -267,7 +267,7 @@ export default class Draggable {
                         this.selectedCardsIndices = newSelection
                     }).catch(err => {
                         alert(`error while arranging cards: ${err}`)
-                        this.match.updatePlayerHand(true)
+                        this.match.updatePlayerHandAnim(true)
                     })
                 }
             }
@@ -289,7 +289,7 @@ export default class Draggable {
                 // this.cancelDragSelectedCards()  // todo this doesnt work, because dragee is already removed :(
                 // forcing a re-render, until the cancelDrag thing can work... unless a force rerender is actually fine?
                 this.match.updateDiscardPileAnim(true)
-                this.match.updatePlayerHand(true)
+                this.match.updatePlayerHandAnim(true)
             })
         }
         else if (this.currentDropZone && (this.currentDropZone === this.currentPlayerNode)) {
@@ -304,7 +304,7 @@ export default class Draggable {
             }).catch(err => {
                 alert(err)
                 // this.cancelDragSelectedCards()
-                this.match.updatePlayerHand(true)
+                this.match.updatePlayerHandAnim(true)
             })
         }
         else {

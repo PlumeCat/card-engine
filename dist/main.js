@@ -3,6 +3,7 @@
 // ==================
 
 // const Cards = import("/cards.js")
+import Animator from "/animator.js";
 import Cards, { getShortCardName, getCardInnerHtml } from "/cards.js"
 import renderModal from "/modals.js"
 import { TurnStates } from "/turn.js"
@@ -223,6 +224,7 @@ class MatchScreen extends GameScreen {
         this.selectedCardsIndices = []  // todo ensure to reset this when necessary
         this.debugPiles = false
         this.draggable = new Draggable(this)
+        this.animator = new Animator(this)
         this.resizeHandler = () => { const margin = this.cardMargin+'px'; $$$('.fuCard').forEach(c => {c.style.margin = margin}) }
     }
     get matchState() {
@@ -233,6 +235,12 @@ class MatchScreen extends GameScreen {
         document.body.innerHTML = this.renderMatch()
         this.renderNode = $(this.renderNodeId)
         window.addEventListener('resize', this.resizeHandler)
+
+        const animate = (now) => {
+            this.animator.render(now * 0.001);
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
     }
     onExit() {
         clearInterval(this.interval)
@@ -257,15 +265,14 @@ class MatchScreen extends GameScreen {
             render()
         }
 
+        this.animator.queueAnimations(this.playState.prev, this.playState)
+
         for (let playerId of this.playState.getOtherPlayerIds()) {
             this.updateOppHand(playerId)
-            this.updateOppHandAnim(playerId)
         }
 
-        this.updateDiscardPileAnim()
         this.updateRemPile()
         this.updatePlayInfo()
-        this.updatePlayerHand()
         this.updateModal()
     }
     onRender() {
@@ -463,22 +470,30 @@ class MatchScreen extends GameScreen {
             </div>
         `
     }
-    updatePlayerHand(force) {
-        if (!force && !this.playState.prevStateDiffers(['hand'])) {
+    updatePlayerHandAnim(force) {
+        if (!force && !this.playState.prevStateDiffers(['hand', 'turnState'])) {
             return
         }
         this.draggable.abort()
-        this.selectedCardsIndices = this.selectedCardsIndices.filter(i => i < this.playState.hand.length)
-        $('playerHand').innerHTML = this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i), "")
-        this.bindPlayerHandEvents()
+        const faceDown = this.playState.turnState === TurnStates.COMBO2_STEALING && this.playState.targetPlayer?.playerId === this.playState.playerId
+        this.selectedCardsIndices = faceDown ? [] : this.selectedCardsIndices.filter(i => i < this.playState.hand.length)
+        $('playerHand').innerHTML = this.playState.hand.reduce((v, c, i) => v + this.renderCard(c, i, faceDown), "")
+        !faceDown && this.bindPlayerHandEvents()
     }
-    renderCard(c, i) {
-        return `
-        <div id="hand-card-cont-${i}">
+    renderCard(c, i, faceDown=false) {
+        const card = faceDown ? `
+            <div class="fduCard fuCardB" style="margin: ${this.cardMargin}px">
+                <div class="fuCardInner"></div>
+            </div>
+        ` : `
             <div id="hand-card-${i}" class="fuCard fuCard${getShortCardName(c)}${this.selectedCardsIndices.includes(i) ? ' fuCardSelected' : ''}"
             style="margin: ${this.cardMargin}px">
                 ${getCardInnerHtml(c)}
             </div>
+        `
+        return `
+        <div id="hand-card-cont-${i}">
+            ${card}
         </div>`
     }
     renderOppHand(pos) {
@@ -502,14 +517,14 @@ class MatchScreen extends GameScreen {
         el.classList[dead ? 'add':'remove']('dead')
         dead && ($(`oppHandInner-${playerId}`).innerHTML = '')
     }
-    updateOppHandAnim(playerId) {
+    updateOppHandAnim(playerId, force) {
         // ANIM: ? -> PICKED (!isYourTurn)
         // ANIM: START -> PLAYING_X (!isYourTurn)
-        if (!this.playState.prevStateDiffers(['playerCardCount'], playerId)) {
+        if (!force && !this.playState.prevStateDiffers(['playerCardCount'], playerId)) {
             return
         }
         const len = this.playState.playerCardCount(playerId)
-        $(`oppHandInner-${playerId}`).innerHTML = len.toString()
+        $(`oppHandInner-${playerId}`).innerHTML = this.playState.playerAlive(playerId) ? len.toString() : ''
     }
     renderMatch() {
         return `

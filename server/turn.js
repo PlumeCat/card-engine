@@ -88,7 +88,12 @@ export const TurnStates = [
     "SHUFFLING",
     "ATTACKING",
     "PICKED",
+    "POST_COMBO2",
+    "POST_COMBO3",
+    "POST_COMBO5",
+    "POST_FAVOUR",
     "DEFUSING",
+    "BOMBED",
     "END",
 
     "NOPE_FUTURE_ODD",
@@ -113,9 +118,15 @@ export const TurnStates = [
 }, {})
 
 export const TurnStateTimers = {
-    [TurnStates.PICKED] : 1000,
-    [TurnStates.SEE_FUTURE] : 5000,
+    [TurnStates.PICKED] : 750,
+    [TurnStates.POST_COMBO2] : 1000,
+    [TurnStates.POST_COMBO3] : 2000,
+    [TurnStates.POST_COMBO5] : 2000,
+    [TurnStates.POST_FAVOUR] : 1000,
+    [TurnStates.SEE_FUTURE] : 4000,
+    [TurnStates.SHUFFLING] : 3000,
     [TurnStates.DEFUSING] : 5000,
+    [TurnStates.BOMBED] : 3000,
 }
 
 export const TurnStateHandlers = {
@@ -234,7 +245,7 @@ export const TurnStateHandlers = {
                         game.winner = winner.playerName
                         throw "VICTORY"
                     }
-                    return TurnStates.END
+                    return TurnStates.BOMBED
                 }
             } else {
                 return TurnStates.END
@@ -330,6 +341,12 @@ export const TurnStateHandlers = {
             const player = game.players.find(p => p.playerId == params.playerId)
             const card = game.hands[target.handIndex].splice(params.targetCardIndex, 1)[0]
             game.hands[player.handIndex].push(card)
+            return TurnStates.POST_COMBO2
+        }
+    },
+    [TurnStates.POST_COMBO2]: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
             return TurnStates.START
         }
     },
@@ -341,10 +358,18 @@ export const TurnStateHandlers = {
             const target = game.players.find(p => p.playerId == game.targetPlayerId)
             const player = game.players.find(p => p.playerId == params.playerId)
             const cardIndex = game.hands[target.handIndex].findIndex(c => c.value == params.targetCard)
+            game.nominatedCard = {targetHas: false, card: Object.values(Cards).find(c => c.value === params.targetCard) }
             if (cardIndex != -1) {
                 const card = game.hands[target.handIndex].splice(cardIndex, 1)[0]
+                game.nominatedCard.targetHas = true
                 game.hands[player.handIndex].push(card)
             }
+            return TurnStates.POST_COMBO3
+        }
+    },
+    [TurnStates.POST_COMBO3]: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
             return TurnStates.START
         }
     },
@@ -356,8 +381,15 @@ export const TurnStateHandlers = {
             if (card == Cards.BOMB) {
                 return
             }
+            game.nominatedCard = {targetHas: false, card: card }
             game.discard.splice(params.targetCardIndex, 1)
             game.hands[player.handIndex].push(card)
+            return TurnStates.POST_COMBO5
+        }
+    },
+    [TurnStates.POST_COMBO5]: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
             return TurnStates.START
         }
     },
@@ -373,6 +405,12 @@ export const TurnStateHandlers = {
             }
             const card = hand.splice(params.targetCardIndex, 1)[0]
             game.hands[player.handIndex].push(card)
+            return TurnStates.POST_FAVOUR
+        }
+    },
+    [TurnStates.POST_FAVOUR]: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
             return TurnStates.START
         }
     },
@@ -409,6 +447,12 @@ export const TurnStateHandlers = {
         } else if (action == "submit-slider") {
             game.remainder.splice(params.insertPos, 0, Cards.BOMB)
             removeBombFromHand()
+            return TurnStates.END
+        }
+    },
+    [TurnStates.BOMBED]: (params, game) => {
+        const action = params.action
+        if (action == "timer") {
             return TurnStates.END
         }
     },

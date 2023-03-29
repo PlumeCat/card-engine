@@ -431,10 +431,15 @@ button[disabled] {
 /* =============================================== */
 
 #playInfo {
-    padding: 10px;
+    margin-bottom: 5px;
     color: #b5d9c7;
     font-size: large;
     text-align: center;
+}
+
+#playInfo > div {
+    min-height: 20px;
+    max-height: 20px;
 }
 
 #combo2OppHand {
@@ -533,6 +538,10 @@ button[disabled] {
     visibility: hidden;
 }
 
+.animated {
+    position: fixed;
+    z-index: 20;
+}
 
 .hidden {
     display: none!important;
