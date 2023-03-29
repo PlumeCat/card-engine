@@ -35,7 +35,6 @@ const main = async () => {
                 // decision tree
                 if (gameState.turnState == TurnStates.START) {
                     if (getIsMyTurn()) {
-                        await setTimeout(() => {}, 1000)
 
                         // 10% chance to play a random card (if possible)
                         

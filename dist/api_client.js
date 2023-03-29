@@ -1,6 +1,16 @@
 // helper functions
 
-const API_PATH = "http://localhost:3000"
+const API_PATH = (() => {
+    if (globalThis.window && window.location) {
+        // browser
+        return window.location.origin
+    } else {
+        // node
+        console.log(process.argv)
+        return process.argv[2]
+    }
+})()
+
 const makeParams = (params) => (params ? Object.entries(params).reduce((value, entry, i) => value + `${i ? "&" : ""}${encodeURIComponent(entry[0])}=${encodeURIComponent(entry[1])}`, "?") : "")
 const api = (method, path, params, headers, body) => fetch(API_PATH + path + makeParams(params), {
         method: method,
@@ -11,6 +21,7 @@ const api = (method, path, params, headers, body) => fetch(API_PATH + path + mak
     })
     .then(
         response => {
+            console.log(response)
             if (response.status >= 200 && response.status < 299) {
                 return response.json()
             }

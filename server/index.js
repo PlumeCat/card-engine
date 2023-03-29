@@ -69,8 +69,6 @@ const createGame = () => {
 }
 
 
-
-
 app.get("/create-game", (req, res) => {
     log("create_game")
     const playerName = req.query["playerName"] || 'player 1'
@@ -93,8 +91,6 @@ app.get("/create-game", (req, res) => {
         playerId: games[gameId].players[0].playerId
     })
 })
-
-
 
 app.get("/join", (req, res) => {
     log("join")
