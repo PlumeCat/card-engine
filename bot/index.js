@@ -8,14 +8,13 @@ const log = console.log
 const makeBotName = () => "BOT-" + Math.floor(Math.random() * 1000).toString()
 
 const main = async () => {
-    // const gameId = process.argv[2]
     // log("attempting to join game: ", gameId)
     log("joining game")
     const name = makeBotName()
+    const gameId = process.argv[3]
     
     try {
-        const res = await apiGet("/join", { playerName:name, gameId: "WASD" })
-        const gameId = res.gameId
+        const res = await apiGet("/join", { playerName:name, gameId })
         const playerId = res.playerId
         log("successfully joined as bot: ", name, playerId)
         

@@ -95,8 +95,7 @@ app.get("/create-game", (req, res) => {
 app.get("/join", (req, res) => {
     log("join")
     const gameId = req.query["gameId"]
-    // const game = games[gameId]
-    const game = Object.values(games)[0]
+    const game = games[gameId]
     if (!game) {
         return res.status(400).send({ message: "game not found" })
     }
@@ -114,7 +113,7 @@ app.get("/join", (req, res) => {
         game.matchState = MatchState.PLAYING
     }
     return res.status(200).send({
-        gameId: Object.keys(games)[0],
+        gameId,
         playerName,
         playerId
     }) // TODO: return immediate game state?
@@ -188,8 +187,7 @@ const onMatchAction = (params, game) => {
 app.post("/action", (req, res) => {
     log("action")
     const gameId = req.body["gameId"]
-    //const game = games[gameId]
-    const game = Object.values(games)[0]
+    const game = games[gameId]
     if (!game) {
         return res.status(400).send({ message: "game not found" })
     }
@@ -243,8 +241,7 @@ app.post("/action", (req, res) => {
 app.get("/state", (req, res) => {
     // log("state")
     const gameId = req.query["gameId"]
-    // const game = games[gameId]
-    const game = Object.values(games)[0]
+    const game = games[gameId]
     if (!game) {
         return res.status(400).send({ message: "game not found" })
     }
