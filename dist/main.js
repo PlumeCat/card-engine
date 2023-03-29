@@ -465,7 +465,7 @@ class MatchScreen extends GameScreen {
         $('matchRemPileTopCardInner').innerHTML = len <= 10 ? len.toString() : len < 15 ? '10+' : len < 20 ? '15+' : '?'
     }
     updatePlayInfo() {
-        if (!this.playState.prevStateDiffers(['playerTurn', 'attackedId', 'turnState'])) {
+        if (!this.playState.prevStateDiffers(Object.keys(this.playState.game))) {
             return
         }
         $('playInfo').innerHTML = `
